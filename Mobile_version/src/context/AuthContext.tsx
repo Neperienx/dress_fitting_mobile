@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 
-import { supabase } from '../lib/supabase';
+import { assertSupabaseConfigured, supabase } from '../lib/supabase';
 
 type SignUpInput = {
   email: string;
@@ -47,10 +47,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       loading,
       signIn: async (email: string, password: string) => {
+        assertSupabaseConfigured();
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       },
       signUp: async ({ email, password, firstName, lastName }: SignUpInput) => {
+        assertSupabaseConfigured();
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error;
       },
       resetPassword: async (email: string) => {
+        assertSupabaseConfigured();
         const { error } = await supabase.auth.resetPasswordForEmail(email);
         if (error) throw error;
       }
