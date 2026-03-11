@@ -32,3 +32,10 @@ npm run start
 - Bride profile intake forms
 - Dress catalog + tag filters
 - Studio/store CRUD and team roles
+
+
+## Troubleshooting
+
+- If you see `Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY` and `Network request failed`, your app is running without Supabase credentials.
+- Ensure `Mobile_version/.env` exists and contains valid `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` values.
+- After editing `.env`, fully restart Expo (`npm run start` again) so the variables are reloaded.

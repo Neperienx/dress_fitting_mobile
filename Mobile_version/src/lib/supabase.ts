@@ -6,11 +6,20 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
+export const missingSupabaseEnvMessage =
+  'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to Mobile_version/.env, then restart Expo.';
+
 if (!isSupabaseConfigured) {
   // eslint-disable-next-line no-console
   console.warn(
     'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. Falling back to a placeholder client until env vars are configured.'
   );
+}
+
+export function assertSupabaseConfigured() {
+  if (!isSupabaseConfigured) {
+    throw new Error(missingSupabaseEnvMessage);
+  }
 }
 
 const fallbackSupabaseUrl = 'https://placeholder.supabase.co';
