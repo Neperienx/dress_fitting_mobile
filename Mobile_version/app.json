@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Bridal Studio",
+    "slug": "bridal-studio-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.bridalstudiomobile"
+    },
+    "android": {
+      "package": "com.example.bridalstudiomobile"
+    }
+  }
+}
