@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +15,7 @@ import {
 
 import { useAuth } from '../context/AuthContext';
 import { assertSupabaseConfigured, supabase } from '../lib/supabase';
+import { StoresStackParamList } from '../navigation/AppNavigator';
 
 type Store = {
   id: string;
@@ -21,7 +23,9 @@ type Store = {
   city: string | null;
 };
 
-export default function StoresScreen() {
+type Props = NativeStackScreenProps<StoresStackParamList, 'StoresList'>;
+
+export default function StoresScreen({ navigation }: Props) {
   const { session } = useAuth();
   const [stores, setStores] = useState<Store[]>([]);
   const [loadingStores, setLoadingStores] = useState(true);
@@ -103,7 +107,17 @@ export default function StoresScreen() {
   const storeTiles = useMemo(
     () =>
       stores.map((store) => (
-        <View key={store.id} style={styles.storeTile}>
+        <Pressable
+          key={store.id}
+          style={styles.storeTile}
+          onPress={() =>
+            navigation.navigate('StoreDetail', {
+              storeId: store.id,
+              storeName: store.name,
+              storeCity: store.city
+            })
+          }
+        >
           <Text style={styles.storeIcon}>🏬</Text>
           <Text numberOfLines={2} style={styles.storeName}>
             {store.name}
@@ -111,9 +125,9 @@ export default function StoresScreen() {
           <Text numberOfLines={1} style={styles.storeLocation}>
             {store.city || 'Location not set'}
           </Text>
-        </View>
+        </Pressable>
       )),
-    [stores]
+    [navigation, stores]
   );
 
   return (

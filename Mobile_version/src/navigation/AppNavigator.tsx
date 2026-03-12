@@ -12,6 +12,7 @@ import HomeScreen from '../screens/HomeScreen';
 import SessionScreen from '../screens/SessionScreen';
 import StoresScreen from '../screens/StoresScreen';
 import AlertsScreen from '../screens/AlertsScreen';
+import StoreDetailScreen from '../screens/StoreDetailScreen';
 
 type AuthStackParamList = {
   Login: undefined;
@@ -26,15 +27,38 @@ type AppTabsParamList = {
   Alerts: undefined;
 };
 
+export type StoresStackParamList = {
+  StoresList: undefined;
+  StoreDetail: {
+    storeId: string;
+    storeName: string;
+    storeCity: string | null;
+  };
+};
+
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tabs = createBottomTabNavigator<AppTabsParamList>();
+const StoresStack = createNativeStackNavigator<StoresStackParamList>();
+
+function StoresNavigator() {
+  return (
+    <StoresStack.Navigator>
+      <StoresStack.Screen name="StoresList" component={StoresScreen} options={{ title: 'Stores', headerShown: false }} />
+      <StoresStack.Screen
+        name="StoreDetail"
+        component={StoreDetailScreen}
+        options={({ route }) => ({ title: route.params.storeName })}
+      />
+    </StoresStack.Navigator>
+  );
+}
 
 function AppTabs() {
   return (
     <Tabs.Navigator>
       <Tabs.Screen name="Home" component={HomeScreen} />
       <Tabs.Screen name="Session" component={SessionScreen} />
-      <Tabs.Screen name="Stores" component={StoresScreen} />
+      <Tabs.Screen name="Stores" component={StoresNavigator} options={{ headerShown: false }} />
       <Tabs.Screen name="Alerts" component={AlertsScreen} />
     </Tabs.Navigator>
   );
