@@ -34,13 +34,45 @@ type Dress = {
 
 type Props = NativeStackScreenProps<StoresStackParamList, 'Inventory'>;
 
-const emptyPhotoField = [''];
+type MaybeImagePickerModule = {
+  requestMediaLibraryPermissionsAsync: () => Promise<{ granted: boolean }>;
+  launchImageLibraryAsync: (options: {
+    mediaTypes: string[];
+    allowsMultipleSelection: boolean;
+    quality: number;
+  }) => Promise<{ canceled: boolean; assets: { uri: string }[] }>;
+};
+
+type MaybeDocumentPickerModule = {
+  getDocumentAsync: (options: {
+    type: string;
+    multiple: boolean;
+  }) => Promise<{ canceled: boolean; assets: { uri: string }[] }>;
+};
+
+const emptyPhotoField: string[] = [];
 
 const allowedImageUriSchemes = ['http://', 'https://', 'file://', 'content://', 'data:image/'];
 
 function isSupportedImageUri(value: string) {
   const normalized = value.trim().toLowerCase();
   return allowedImageUriSchemes.some((scheme) => normalized.startsWith(scheme));
+}
+
+function loadImagePickerModule(): MaybeImagePickerModule | null {
+  try {
+    return require('expo-image-picker') as MaybeImagePickerModule;
+  } catch {
+    return null;
+  }
+}
+
+function loadDocumentPickerModule(): MaybeDocumentPickerModule | null {
+  try {
+    return require('expo-document-picker') as MaybeDocumentPickerModule;
+  } catch {
+    return null;
+  }
 }
 
 export default function InventoryScreen({ route }: Props) {
@@ -104,22 +136,61 @@ export default function InventoryScreen({ route }: Props) {
     setShowCreateDressModal(false);
   }, [savingDress]);
 
-  const updatePhotoUrl = useCallback((index: number, value: string) => {
-    setPhotoUrls((previous) => previous.map((photo, photoIndex) => (photoIndex === index ? value : photo)));
+  const appendPhotoUris = useCallback((uris: string[]) => {
+    if (uris.length === 0) {
+      return;
+    }
+
+    setPhotoUrls((previous) => [...previous, ...uris]);
   }, []);
 
-  const addPhotoField = useCallback(() => {
-    setPhotoUrls((previous) => [...previous, '']);
-  }, []);
+  const pickFromGallery = useCallback(async () => {
+    const imagePicker = loadImagePickerModule();
+    if (!imagePicker) {
+      Alert.alert('Gallery unavailable', 'expo-image-picker is not installed in this build.');
+      return;
+    }
 
-  const removePhotoField = useCallback((index: number) => {
-    setPhotoUrls((previous) => {
-      if (previous.length === 1) {
-        return previous;
-      }
+    const permissionResponse = await imagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResponse.granted) {
+      Alert.alert('Permission required', 'Please allow access to your photo library to add images.');
+      return;
+    }
 
-      return previous.filter((_, photoIndex) => photoIndex !== index);
+    const result = await imagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 1
     });
+
+    if (result.canceled) {
+      return;
+    }
+
+    appendPhotoUris(result.assets.map((asset) => asset.uri));
+  }, [appendPhotoUris]);
+
+  const pickFromFiles = useCallback(async () => {
+    const documentPicker = loadDocumentPickerModule();
+    if (!documentPicker) {
+      Alert.alert('Files unavailable', 'expo-document-picker is not installed in this build.');
+      return;
+    }
+
+    const result = await documentPicker.getDocumentAsync({
+      type: 'image/*',
+      multiple: true
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    appendPhotoUris(result.assets.map((asset) => asset.uri));
+  }, [appendPhotoUris]);
+
+  const clearPhotos = useCallback(() => {
+    setPhotoUrls([]);
   }, []);
 
   const createDress = useCallback(async () => {
@@ -261,29 +332,34 @@ export default function InventoryScreen({ route }: Props) {
 
             <Text style={styles.photoSectionLabel}>Photos (at least one required)</Text>
             <Text style={styles.photoSectionHint}>
-              Use either hosted URLs or local file URIs from your gallery/files app.
+              Choose images from your gallery or files. You can keep adding more photos anytime.
             </Text>
-            {photoUrls.map((photoUrl, index) => (
-              <View key={`photo-${index}`} style={styles.photoRow}>
-                <TextInput
-                  style={[styles.input, styles.photoInput]}
-                  placeholder="https://... or file://..."
-                  value={photoUrl}
-                  onChangeText={(value) => updatePhotoUrl(index, value)}
-                  autoCapitalize="none"
-                />
-                <Pressable
-                  style={[styles.photoActionButton, photoUrls.length === 1 && styles.disabledPhotoActionButton]}
-                  onPress={() => removePhotoField(index)}
-                  disabled={photoUrls.length === 1}
-                >
-                  <Text style={styles.photoActionText}>−</Text>
-                </Pressable>
+            <View style={styles.photoButtonRow}>
+              <Pressable style={[styles.photoPickerButton, styles.filesButton]} onPress={() => void pickFromFiles()}>
+                <Text style={styles.photoPickerButtonText}>Files</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.photoPickerButton, styles.galleryButton]}
+                onPress={() => void pickFromGallery()}
+              >
+                <Text style={styles.photoPickerButtonText}>Gallery</Text>
+              </Pressable>
+            </View>
+
+            {photoUrls.length > 0 ? (
+              <View style={styles.previewContainer}>
+                <View style={styles.previewStack}>
+                  {photoUrls.length > 1 ? <View style={[styles.previewPhoto, styles.previewPhotoBack]} /> : null}
+                  <Image source={{ uri: photoUrls[0] }} style={[styles.previewPhoto, styles.previewPhotoFront]} />
+                </View>
+                <View style={styles.previewMeta}>
+                  <Text style={styles.previewCount}>{photoUrls.length} photo(s) selected</Text>
+                  <Pressable style={styles.clearPhotosButton} onPress={clearPhotos}>
+                    <Text style={styles.clearPhotosButtonText}>Clear</Text>
+                  </Pressable>
+                </View>
               </View>
-            ))}
-            <Pressable style={styles.addPhotoButton} onPress={addPhotoField}>
-              <Text style={styles.addPhotoButtonText}>+ Add another photo</Text>
-            </Pressable>
+            ) : null}
 
             <View style={styles.modalActions}>
               <Pressable style={[styles.actionButton, styles.cancelButton]} onPress={closeCreateModal}>
@@ -353,20 +429,33 @@ const styles = StyleSheet.create({
   },
   photoSectionLabel: { color: '#4f4a63', fontWeight: '600', marginTop: 2 },
   photoSectionHint: { color: '#7b7690', fontSize: 12, marginTop: -2, marginBottom: 2 },
-  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  photoInput: { flex: 1 },
-  photoActionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#eceaf4',
+  photoButtonRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  photoPickerButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center'
   },
-  disabledPhotoActionButton: { opacity: 0.5 },
-  photoActionText: { fontSize: 20, color: '#3f3b52' },
-  addPhotoButton: { alignSelf: 'flex-start', paddingVertical: 4 },
-  addPhotoButtonText: { color: '#5f5881', fontWeight: '600' },
+  filesButton: { backgroundColor: '#5f61cd' },
+  galleryButton: { backgroundColor: '#8f46c8' },
+  photoPickerButtonText: { color: '#fff', fontWeight: '700' },
+  previewContainer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+  previewStack: { width: 54, height: 58, justifyContent: 'center', alignItems: 'center' },
+  previewPhoto: {
+    width: 46,
+    height: 46,
+    borderRadius: 8,
+    backgroundColor: '#ddd7f2',
+    borderWidth: 1,
+    borderColor: '#d2cce8'
+  },
+  previewPhotoBack: { position: 'absolute', top: 8, left: 8, backgroundColor: '#ece9f8' },
+  previewPhotoFront: { position: 'absolute', top: 3, left: 3 },
+  previewMeta: { gap: 2 },
+  previewCount: { color: '#4a4561', fontWeight: '600' },
+  clearPhotosButton: { alignSelf: 'flex-start', paddingVertical: 2 },
+  clearPhotosButtonText: { color: '#70688f', fontWeight: '600' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
   actionButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
   cancelButton: { backgroundColor: '#eceaf4' },
