@@ -21,7 +21,7 @@ const sections: MenuSection[] = [
   {
     key: 'inventory',
     title: 'Inventory',
-    subtitle: '246 Dresses Available'
+    subtitle: 'Manage dress profiles'
   },
   {
     key: 'insights',
@@ -30,10 +30,19 @@ const sections: MenuSection[] = [
   }
 ];
 
-export default function StoreDetailScreen({ route }: Props) {
-  const { storeName, storeCity } = route.params;
+export default function StoreDetailScreen({ navigation, route }: Props) {
+  const { storeId, storeName, storeCity } = route.params;
   const [searchValue, setSearchValue] = useState('');
   const [activeOverlay, setActiveOverlay] = useState<MenuSection | null>(null);
+
+  const handleSectionPress = (section: MenuSection) => {
+    if (section.key === 'inventory') {
+      navigation.navigate('Inventory', { storeId, storeName });
+      return;
+    }
+
+    setActiveOverlay(section);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -51,7 +60,7 @@ export default function StoreDetailScreen({ route }: Props) {
 
         <View style={styles.sectionList}>
           {sections.map((section) => (
-            <Pressable key={section.key} style={styles.sectionCard} onPress={() => setActiveOverlay(section)}>
+            <Pressable key={section.key} style={styles.sectionCard} onPress={() => handleSectionPress(section)}>
               <View style={styles.sectionTextWrap}>
                 <Text style={styles.sectionTitle}>{section.title}</Text>
                 <Text style={styles.sectionSubtitle}>{section.subtitle}</Text>

@@ -13,6 +13,7 @@ import SessionScreen from '../screens/SessionScreen';
 import StoresScreen from '../screens/StoresScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import StoreDetailScreen from '../screens/StoreDetailScreen';
+import InventoryScreen from '../screens/InventoryScreen';
 
 type AuthStackParamList = {
   Login: undefined;
@@ -34,6 +35,10 @@ export type StoresStackParamList = {
     storeName: string;
     storeCity: string | null;
   };
+  Inventory: {
+    storeId: string;
+    storeName: string;
+  };
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -48,6 +53,12 @@ function StoresNavigator() {
         name="StoreDetail"
         component={StoreDetailScreen}
         options={({ route }) => ({ title: route.params.storeName })}
+      />
+
+      <StoresStack.Screen
+        name="Inventory"
+        component={InventoryScreen}
+        options={({ route }) => ({ title: `${route.params.storeName} Inventory` })}
       />
     </StoresStack.Navigator>
   );
