@@ -8,14 +8,42 @@ npm install
 npm run start
 ```
 
-## 2) Configure auth + database
+## 2) Start Supabase locally
 
-1. Create a Supabase project.
-2. Copy `.env.example` to `.env` and fill both values.
-3. Run the SQL in `supabase/migrations/001_init.sql` in Supabase SQL editor.
-4. In Supabase Authentication settings, enable Email provider.
+From `Mobile_version/`:
 
-## 3) What is ready
+```bash
+npx supabase start
+npx supabase db reset
+```
+
+Then copy the values printed by `supabase start` into `Mobile_version/.env`:
+
+```bash
+cp .env.example .env
+```
+
+Set:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+### Which local URL should I use?
+
+Use the Supabase URL that your app runtime can reach:
+
+- **Android emulator:** `http://10.0.2.2:54321`
+- **iOS simulator:** `http://127.0.0.1:54321` (or `http://localhost:54321`)
+- **Physical phone (Expo Go):** `http://<your-computer-LAN-IP>:54321` (for example `http://192.168.1.40:54321`)
+
+> Note: the app auto-converts `localhost`/`127.0.0.1` to `10.0.2.2` when running on Android.
+
+## 3) Configure auth + database
+
+1. Keep Email provider enabled in Supabase Authentication settings.
+2. If you changed schemas, run `npx supabase db reset` again.
+
+## 4) What is ready
 
 - Auth flow with email/password:
   - Sign in
@@ -26,16 +54,16 @@ npm run start
   - Login, Signup, ForgotPassword, Home, Session, Stores, Alerts
 - Placeholder tabs after login aligned with your wireframe directions.
 
-## 4) Next pages to implement
+## 5) Next pages to implement
 
 - Swipe card deck on `SessionScreen.tsx`
 - Bride profile intake forms
 - Dress catalog + tag filters
 - Studio/store CRUD and team roles
 
-
 ## Troubleshooting
 
-- If you see `Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY` and `Network request failed`, your app is running without Supabase credentials.
-- Ensure `Mobile_version/.env` exists and contains valid `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` values.
-- After editing `.env`, fully restart Expo (`npm run start` again) so the variables are reloaded.
+- If you see `Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY`, your `.env` was not loaded.
+- If you see `Network request failed`, the host in `EXPO_PUBLIC_SUPABASE_URL` is not reachable from your runtime.
+- After editing `.env`, fully restart Expo (`npm run start` again).
+- For physical devices, ensure phone and computer are on the same network and port `54321` is reachable.

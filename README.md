@@ -22,9 +22,19 @@ React Native + Expo starter for a bridal studio mobile app.
 ```bash
 cd Mobile_version
 npm install
+npx supabase start
+npx supabase db reset
 cp .env.example .env
-# Fill EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY
+# Fill EXPO_PUBLIC_SUPABASE_URL + EXPO_PUBLIC_SUPABASE_ANON_KEY from Supabase CLI output
 npm run start
 ```
 
-Then run SQL from `Mobile_version/supabase/migrations/001_init.sql` in your Supabase project.
+## Local Supabase URL guide
+
+Use a URL your runtime can access:
+
+- Android emulator: `http://10.0.2.2:54321`
+- iOS simulator: `http://127.0.0.1:54321`
+- Physical device: `http://<your-computer-LAN-IP>:54321`
+
+Full setup/troubleshooting is in `Mobile_version/README_Mobile.md`.

@@ -1,8 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+function normalizeSupabaseUrl(url?: string) {
+  if (!url) {
+    return url;
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+
+    if (Platform.OS === 'android' && (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1')) {
+      parsedUrl.hostname = '10.0.2.2';
+      return parsedUrl.toString().replace(/\/$/, '');
+    }
+
+    return parsedUrl.toString().replace(/\/$/, '');
+  } catch {
+    return url;
+  }
+}
+
+const supabaseUrl = normalizeSupabaseUrl(rawSupabaseUrl);
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
@@ -14,6 +36,11 @@ if (!isSupabaseConfigured) {
   console.warn(
     'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. Falling back to a placeholder client until env vars are configured.'
   );
+}
+
+if (rawSupabaseUrl && supabaseUrl && rawSupabaseUrl !== supabaseUrl) {
+  // eslint-disable-next-line no-console
+  console.info(`EXPO_PUBLIC_SUPABASE_URL normalized from ${rawSupabaseUrl} to ${supabaseUrl} for ${Platform.OS}.`);
 }
 
 export function assertSupabaseConfigured() {
