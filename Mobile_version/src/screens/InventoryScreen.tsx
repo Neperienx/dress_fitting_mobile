@@ -36,6 +36,13 @@ type Props = NativeStackScreenProps<StoresStackParamList, 'Inventory'>;
 
 const emptyPhotoField = [''];
 
+const allowedImageUriSchemes = ['http://', 'https://', 'file://', 'content://', 'data:image/'];
+
+function isSupportedImageUri(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return allowedImageUriSchemes.some((scheme) => normalized.startsWith(scheme));
+}
+
 export default function InventoryScreen({ route }: Props) {
   const { session } = useAuth();
   const { storeId, storeName } = route.params;
@@ -126,7 +133,15 @@ export default function InventoryScreen({ route }: Props) {
     }
 
     if (sanitizedPhotoUrls.length === 0) {
-      Alert.alert('At least one photo required', 'Please add at least one photo URL before saving.');
+      Alert.alert('At least one photo required', 'Please add at least one photo URI before saving.');
+      return;
+    }
+
+    if (sanitizedPhotoUrls.some((photoUri) => !isSupportedImageUri(photoUri))) {
+      Alert.alert(
+        'Invalid photo URI',
+        'Use an image URI that starts with http://, https://, file://, content://, or data:image/.'
+      );
       return;
     }
 
@@ -245,11 +260,14 @@ export default function InventoryScreen({ route }: Props) {
             />
 
             <Text style={styles.photoSectionLabel}>Photos (at least one required)</Text>
+            <Text style={styles.photoSectionHint}>
+              Use either hosted URLs or local file URIs from your gallery/files app.
+            </Text>
             {photoUrls.map((photoUrl, index) => (
               <View key={`photo-${index}`} style={styles.photoRow}>
                 <TextInput
                   style={[styles.input, styles.photoInput]}
-                  placeholder="https://..."
+                  placeholder="https://... or file://..."
                   value={photoUrl}
                   onChangeText={(value) => updatePhotoUrl(index, value)}
                   autoCapitalize="none"
@@ -334,6 +352,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#faf9ff'
   },
   photoSectionLabel: { color: '#4f4a63', fontWeight: '600', marginTop: 2 },
+  photoSectionHint: { color: '#7b7690', fontSize: 12, marginTop: -2, marginBottom: 2 },
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   photoInput: { flex: 1 },
   photoActionButton: {
