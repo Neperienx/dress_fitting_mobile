@@ -5,12 +5,12 @@ import { useAuth } from '../context/AuthContext';
 
 export default function ForgotPasswordScreen() {
   const { resetPassword } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
 
   const handleReset = async () => {
     try {
-      await resetPassword(email.trim());
-      Alert.alert('Reset sent', 'Check your email for reset instructions.');
+      await resetPassword(username);
+      Alert.alert('Reset sent', 'If the username exists, reset instructions were sent.');
     } catch (error) {
       Alert.alert('Reset failed', (error as Error).message);
     }
@@ -19,10 +19,10 @@ export default function ForgotPasswordScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Forgot password</Text>
-      <Text style={styles.subtitle}>Enter your email and we will send a reset link.</Text>
-      <TextInput placeholder="Email" value={email} onChangeText={setEmail} style={styles.input} autoCapitalize="none" />
+      <Text style={styles.subtitle}>Enter your username and we will send a reset link.</Text>
+      <TextInput placeholder="Username" value={username} onChangeText={setUsername} style={styles.input} autoCapitalize="none" />
       <Pressable style={styles.button} onPress={handleReset}>
-        <Text style={styles.buttonText}>Send reset email</Text>
+        <Text style={styles.buttonText}>Send reset link</Text>
       </Pressable>
     </View>
   );

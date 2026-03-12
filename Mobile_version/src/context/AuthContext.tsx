@@ -4,19 +4,31 @@ import { Session } from '@supabase/supabase-js';
 import { assertSupabaseConfigured, supabase } from '../lib/supabase';
 
 type SignUpInput = {
-  email: string;
+  username: string;
   password: string;
-  firstName: string;
-  lastName: string;
 };
+
+const USERNAME_EMAIL_DOMAIN = 'login.local';
+
+function normalizeUsername(username: string) {
+  return username.trim().toLowerCase();
+}
+
+function usernameToEmail(username: string) {
+  const normalizedUsername = normalizeUsername(username);
+  if (normalizedUsername.includes('@')) {
+    return normalizedUsername;
+  }
+  return `${normalizedUsername}@${USERNAME_EMAIL_DOMAIN}`;
+}
 
 type AuthContextValue = {
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (username: string, password: string) => Promise<void>;
   signUp: (input: SignUpInput) => Promise<void>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+  resetPassword: (username: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -46,20 +58,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       session,
       loading,
-      signIn: async (email: string, password: string) => {
+      signIn: async (username: string, password: string) => {
         assertSupabaseConfigured();
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: usernameToEmail(username), password });
         if (error) throw error;
       },
-      signUp: async ({ email, password, firstName, lastName }: SignUpInput) => {
+      signUp: async ({ username, password }: SignUpInput) => {
         assertSupabaseConfigured();
+        const normalizedUsername = normalizeUsername(username);
         const { error } = await supabase.auth.signUp({
-          email,
+          email: usernameToEmail(normalizedUsername),
           password,
           options: {
             data: {
-              first_name: firstName,
-              last_name: lastName
+              username: normalizedUsername
             }
           }
         });
@@ -69,9 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
       },
-      resetPassword: async (email: string) => {
+      resetPassword: async (username: string) => {
         assertSupabaseConfigured();
-        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        const { error } = await supabase.auth.resetPasswordForEmail(usernameToEmail(username));
         if (error) throw error;
       }
     }),

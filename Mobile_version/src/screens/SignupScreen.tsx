@@ -14,15 +14,13 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
 
 export default function SignupScreen({ navigation }: Props) {
   const { signUp } = useAuth();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSignUp = async () => {
     try {
-      await signUp({ firstName, lastName, email: email.trim(), password });
-      Alert.alert('Check your email', 'Confirm your account via email, then sign in.');
+      await signUp({ username, password });
+      Alert.alert('Account created', 'You can now sign in with your username and password.');
       navigation.navigate('Login');
     } catch (error) {
       Alert.alert('Sign-up failed', (error as Error).message);
@@ -32,9 +30,7 @@ export default function SignupScreen({ navigation }: Props) {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Create account</Text>
-      <TextInput placeholder="First name" value={firstName} onChangeText={setFirstName} style={styles.input} />
-      <TextInput placeholder="Last name" value={lastName} onChangeText={setLastName} style={styles.input} />
-      <TextInput placeholder="Email" value={email} onChangeText={setEmail} style={styles.input} autoCapitalize="none" />
+      <TextInput placeholder="Username" value={username} onChangeText={setUsername} style={styles.input} autoCapitalize="none" />
       <TextInput
         placeholder="Password"
         value={password}
