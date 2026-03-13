@@ -78,6 +78,21 @@ function getErrorMessage(error: unknown) {
   return 'Unknown error';
 }
 
+function isMissingInventorySchemaError(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const code = 'code' in error && typeof error.code === 'string' ? error.code : null;
+  const message = 'message' in error && typeof error.message === 'string' ? error.message.toLowerCase() : '';
+
+  return code === 'PGRST205' && (message.includes('public.dresses') || message.includes('public.dress_images'));
+}
+
+function getInventorySchemaMissingMessage() {
+  return 'Inventory tables are missing in your Supabase project. Run `npx supabase db push` (or `npx supabase db reset` for local dev) from `Mobile_version/`, then reload the app.';
+}
+
 function loadImagePickerModule(): MaybeImagePickerModule | null {
   try {
     return require('expo-image-picker') as MaybeImagePickerModule;
@@ -126,6 +141,11 @@ export default function InventoryScreen({ route }: Props) {
       }));
       setDresses(formatted as Dress[]);
     } catch (error) {
+      if (isMissingInventorySchemaError(error)) {
+        Alert.alert('Could not load inventory', getInventorySchemaMissingMessage());
+        return;
+      }
+
       Alert.alert('Could not load inventory', getErrorMessage(error));
     } finally {
       setLoading(false);
@@ -278,6 +298,11 @@ export default function InventoryScreen({ route }: Props) {
       resetForm();
       await loadDresses();
     } catch (error) {
+      if (isMissingInventorySchemaError(error)) {
+        Alert.alert('Could not save dress', getInventorySchemaMissingMessage());
+        return;
+      }
+
       const debugMessage = getErrorMessage(error);
       console.error('[InventoryScreen] Failed to save dress', {
         storeId,
