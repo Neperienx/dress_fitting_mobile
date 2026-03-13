@@ -29,6 +29,7 @@ export type SavedSession = {
   allStoreDresses: SessionDress[];
   tagScores: Record<string, TagSummary>;
   dressDecisions: Record<string, SwipeDecision>;
+  shortlistDressIds?: string[];
 };
 
 function getSessionHistoryKey(storeId: string) {
