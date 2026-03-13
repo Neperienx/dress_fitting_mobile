@@ -881,8 +881,8 @@ const styles = StyleSheet.create({
   analyticsTag: { color: '#65585E', fontWeight: '600' },
   analyticsScore: { color: '#8B7E83', fontWeight: '600' },
   analyticsBarTrack: { flexDirection: 'row', height: 10, width: '100%', borderRadius: 5, overflow: 'hidden', backgroundColor: '#F3DCE3' },
-  analyticsBarLike: { backgroundColor: '#DEA9B6', height: '100%' },
-  analyticsBarDislike: { backgroundColor: '#E8CFA8', height: '100%' },
+  analyticsBarLike: { backgroundColor: '#2EAF64', height: '100%' },
+  analyticsBarDislike: { backgroundColor: '#D94D4D', height: '100%' },
   rankingCard: {
     flexDirection: 'row',
     gap: 12,
