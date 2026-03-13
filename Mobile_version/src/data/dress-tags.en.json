@@ -1,35 +1,74 @@
 {
   "language": "English",
-  "tags": [
-    "A-Line",
-    "Ball Gown",
-    "Mermaid",
-    "Sheath",
-    "Fit & Flare",
-    "Boho",
-    "Classic",
-    "Modern",
-    "Minimalist",
-    "Vintage",
-    "Romantic",
-    "Princess",
-    "Lace",
-    "Satin",
-    "Tulle",
-    "Beaded",
-    "Off-Shoulder",
-    "Strapless",
-    "Long Sleeves",
-    "Open Back",
-    "High Neck",
-    "Sweetheart Neckline",
-    "Cathedral Train",
-    "Court Train",
-    "No Train",
-    "Plus Size",
-    "Maternity",
-    "Petite Friendly",
-    "Customizable",
-    "Sample Sale"
+  "categories": [
+    {
+      "name": "Core Silhouette Coverage",
+      "tags": [
+        "Ball Gown",
+        "A-line",
+        "Mermaid",
+        "Fit & Flare",
+        "Sheath / Column",
+        "Empire Waist"
+      ]
+    },
+    {
+      "name": "Neckline Coverage",
+      "tags": [
+        "Sweetheart",
+        "Straight Strapless",
+        "V-neck",
+        "Plunging V",
+        "Square",
+        "Off-Shoulder",
+        "High Neck",
+        "Illusion",
+        "Halter"
+      ]
+    },
+    {
+      "name": "Back Types",
+      "tags": [
+        "Low Back",
+        "Deep V Back",
+        "Button Back",
+        "Corset",
+        "Illusion Lace",
+        "Keyhole"
+      ]
+    },
+    {
+      "name": "Sleeve Type",
+      "tags": [
+        "Strapless",
+        "Spaghetti Strap",
+        "Cap Sleeve",
+        "Long Sleeve",
+        "3/4 Sleeve",
+        "Puff Sleeve",
+        "Off-Shoulder Sleeve"
+      ]
+    },
+    {
+      "name": "Fabric",
+      "tags": [
+        "Satin",
+        "Mikado",
+        "Tulle",
+        "Chiffon",
+        "Organza",
+        "Lace",
+        "Crepe"
+      ]
+    },
+    {
+      "name": "Accessories",
+      "tags": [
+        "Veil",
+        "Belt",
+        "Gloves",
+        "Cape"
+      ]
+    }
   ]
 }

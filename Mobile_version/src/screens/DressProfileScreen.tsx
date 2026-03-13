@@ -14,12 +14,21 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { StoresStackParamList } from '../navigation/AppNavigator';
 
-const englishTagCatalog = require('../data/dress-tags.en.json') as {
-  language: string;
+type TagCategory = {
+  name: string;
   tags: string[];
 };
 
+const englishTagCatalog = require('../data/dress-tags.en.json') as {
+  language: string;
+  categories?: TagCategory[];
+  tags?: string[];
+};
+
 type Props = NativeStackScreenProps<StoresStackParamList, 'DressProfile'>;
+
+const categorizedTagCatalog: TagCategory[] =
+  englishTagCatalog.categories ?? [{ name: 'Tags', tags: englishTagCatalog.tags ?? [] }];
 
 function getTagStorageKey(dressId: string) {
   return `dress-tags:${dressId}`;
@@ -141,15 +150,22 @@ export default function DressProfileScreen({ route }: Props) {
               {activePhoto ? <Image source={{ uri: activePhoto }} style={styles.miniPreview} /> : <View style={styles.miniPreview} />}
               <Text style={styles.previewName}>{dress.name || 'Untitled dress'}</Text>
             </View>
-            <ScrollView contentContainerStyle={styles.tagsGrid}>
-              {englishTagCatalog.tags.map((tag) => {
-                const isActive = selectedTags.includes(tag);
-                return (
-                  <Pressable key={tag} style={[styles.tagChip, isActive && styles.tagChipActive]} onPress={() => void toggleTag(tag)}>
-                    <Text style={[styles.tagChipText, isActive && styles.tagChipTextActive]}>{tag}</Text>
-                  </Pressable>
-                );
-              })}
+            <ScrollView contentContainerStyle={styles.categoriesWrap}>
+              {categorizedTagCatalog.map((category) => (
+                <View key={category.name} style={styles.categorySection}>
+                  <Text style={styles.categoryTitle}>{category.name}</Text>
+                  <View style={styles.tagsGrid}>
+                    {category.tags.map((tag) => {
+                      const isActive = selectedTags.includes(tag);
+                      return (
+                        <Pressable key={tag} style={[styles.tagChip, isActive && styles.tagChipActive]} onPress={() => void toggleTag(tag)}>
+                          <Text style={[styles.tagChipText, isActive && styles.tagChipTextActive]}>{tag}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
             </ScrollView>
           </View>
         </View>
@@ -225,7 +241,10 @@ const styles = StyleSheet.create({
   previewRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   miniPreview: { width: 56, height: 72, borderRadius: 8, backgroundColor: '#ddd8ec' },
   previewName: { color: '#4d4761', fontSize: 15, fontWeight: '600' },
-  tagsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 20 },
+  categoriesWrap: { gap: 16, paddingBottom: 20 },
+  categorySection: { gap: 10 },
+  categoryTitle: { color: '#3f3857', fontSize: 14, fontWeight: '700' },
+  tagsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tagChip: {
     borderRadius: 16,
     borderWidth: 1,
