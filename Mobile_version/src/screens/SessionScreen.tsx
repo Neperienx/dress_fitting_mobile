@@ -45,6 +45,7 @@ type AppTabsParamList = {
   Session: {
     open?: 'recent';
     sessionId?: string;
+    resetToStart?: boolean;
   } | undefined;
   Stores: undefined;
   Alerts: undefined;
@@ -113,7 +114,7 @@ function formatSessionDate(isoDate: string) {
 
 export default function SessionScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<AppTabsParamList>>();
-  const route = useRoute<{ params?: { open?: 'recent'; sessionId?: string } }>();
+  const route = useRoute<{ params?: { open?: 'recent'; sessionId?: string; resetToStart?: boolean } }>();
   const { session } = useAuth();
   const { selectedStore } = useStore();
 
@@ -210,6 +211,15 @@ export default function SessionScreen() {
 
   useEffect(() => {
     const params = route.params;
+
+    if (params?.resetToStart) {
+      setSessionStage('landing');
+      setLandingTab('start');
+      setSelectedHistorySession(null);
+      setActiveTab('analytics');
+      navigation.setParams({ resetToStart: undefined });
+      return;
+    }
 
     if (!params?.open || params.open !== 'recent') {
       return;
