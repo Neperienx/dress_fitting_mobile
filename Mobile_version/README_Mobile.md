@@ -66,4 +66,5 @@ Use the Supabase URL that your app runtime can reach:
 - If you see `Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY`, your `.env` was not loaded.
 - If you see `Network request failed`, the host in `EXPO_PUBLIC_SUPABASE_URL` is not reachable from your runtime.
 - After editing `.env`, fully restart Expo (`npm run start` again).
+- If inventory fails with `Could not find the table 'public.dresses' in the schema cache · code: PGRST205`, your DB is missing the inventory migration. From `Mobile_version/` run `npx supabase db push` (or `npx supabase db reset` for local), then reload the app.
 - For physical devices, ensure phone and computer are on the same network and port `54321` is reachable.
