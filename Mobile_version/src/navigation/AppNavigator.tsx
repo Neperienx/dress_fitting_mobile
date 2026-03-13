@@ -25,7 +25,10 @@ type AuthStackParamList = {
 
 type AppTabsParamList = {
   Home: undefined;
-  Session: undefined;
+  Session: {
+    open?: 'recent';
+    sessionId?: string;
+  } | undefined;
   Stores: undefined;
   Alerts: undefined;
 };
