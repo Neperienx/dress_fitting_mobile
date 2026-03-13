@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { NavigationContainer, NavigatorScreenParams, useNavigation } from '@react-navigation/native';
+import { NavigationContainer, NavigatorScreenParams, RouteProp, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -162,6 +162,19 @@ function StoresNavigator() {
 function AppTabs() {
   const { selectedStore } = useStore();
 
+  const getTabIcon = (route: RouteProp<AppTabsParamList, keyof AppTabsParamList>) => {
+    switch (route.name) {
+      case 'Stores':
+        return '🏠';
+      case 'Session':
+        return '✨';
+      case 'Alerts':
+        return '🔔';
+      default:
+        return '•';
+    }
+  };
+
   const screenOptions = useMemo(
     () => ({
       headerTitle: () => <StoreHeaderTitle />,
@@ -171,7 +184,12 @@ function AppTabs() {
   );
 
   return (
-    <Tabs.Navigator screenOptions={screenOptions}>
+    <Tabs.Navigator
+      screenOptions={({ route }) => ({
+        ...screenOptions,
+        tabBarIcon: () => <Text style={{ fontSize: 18 }}>{getTabIcon(route)}</Text>
+      })}
+    >
       <Tabs.Screen
         name="Home"
         component={HomeScreen}
@@ -180,19 +198,9 @@ function AppTabs() {
         }}
       />
       <Tabs.Screen
-        name="Session"
-        component={SessionScreen}
-        listeners={({ navigation }) => ({
-          tabPress: (event) => {
-            event.preventDefault();
-            navigation.navigate('Session', { resetToStart: true });
-          }
-        })}
-      />
-      <Tabs.Screen
         name="Stores"
         component={StoresNavigator}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, tabBarLabel: 'Store' }}
         listeners={({ navigation }) => ({
           tabPress: (event) => {
             event.preventDefault();
@@ -210,6 +218,16 @@ function AppTabs() {
                 storeCity: selectedStore.city
               }
             });
+          }
+        })}
+      />
+      <Tabs.Screen
+        name="Session"
+        component={SessionScreen}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => {
+            event.preventDefault();
+            navigation.navigate('Session', { resetToStart: true });
           }
         })}
       />
