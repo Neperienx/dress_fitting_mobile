@@ -187,6 +187,11 @@ function AppTabs() {
     <Tabs.Navigator
       screenOptions={({ route }) => ({
         ...screenOptions,
+        headerStyle: { backgroundColor: '#FFFFFF' },
+        headerShadowVisible: false,
+        tabBarStyle: { backgroundColor: '#FFFFFF', borderTopColor: '#E9E4E6' },
+        tabBarActiveTintColor: '#D8A7B1',
+        tabBarInactiveTintColor: '#6B6467',
         tabBarIcon: () => <Text style={{ fontSize: 18 }}>{getTabIcon(route)}</Text>
       })}
     >
@@ -276,7 +281,7 @@ const headerStyles = StyleSheet.create({
   triggerText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#201d30',
+    color: '#2E2A2B',
     maxWidth: 185
   },
   triggerIcon: {
@@ -290,8 +295,8 @@ const headerStyles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: '#d8d3e7',
-    backgroundColor: '#fff'
+    borderColor: '#E9E4E6',
+    backgroundColor: '#FFFFFF'
   },
   accountButtonIcon: {
     fontSize: 18
@@ -307,22 +312,22 @@ const headerStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#e5e2ef',
+    borderColor: '#E9E4E6',
     overflow: 'hidden'
   },
   menuItem: {
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eeebf7'
+    borderBottomColor: '#EFE8EB'
   },
   menuItemText: {
-    color: '#37324a'
+    color: '#2E2A2B'
   },
   menuItemSelected: {
     fontWeight: '700',
-    color: '#26213a'
+    color: '#2E2A2B'
   }
 });

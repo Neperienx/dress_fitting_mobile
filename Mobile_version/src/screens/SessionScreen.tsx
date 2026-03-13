@@ -709,7 +709,7 @@ export default function SessionScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f3f1f8' },
+  screen: { flex: 1, backgroundColor: '#F8F5F7' },
   content: {
     flexGrow: 1,
     alignItems: 'center',
@@ -717,12 +717,12 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     gap: 14
   },
-  landingTabs: { flexDirection: 'row', backgroundColor: '#e8e4f2', borderRadius: 14, padding: 3, width: '100%' },
+  landingTabs: { flexDirection: 'row', backgroundColor: '#F1D9DF', borderRadius: 14, padding: 3, width: '100%' },
   landingTabButton: { flex: 1, borderRadius: 11, paddingVertical: 8, alignItems: 'center' },
-  landingTabButtonActive: { backgroundColor: '#fff' },
-  landingTabText: { color: '#645d79', fontWeight: '600' },
-  landingTabTextActive: { color: '#332c47' },
-  title: { fontSize: 29, fontWeight: '700', color: '#302b41' },
+  landingTabButtonActive: { backgroundColor: '#FFFFFF' },
+  landingTabText: { color: '#6B6467', fontWeight: '600' },
+  landingTabTextActive: { color: '#2E2A2B' },
+  title: { fontSize: 29, fontWeight: '700', color: '#2E2A2B' },
   subtitle: { color: '#6d6880', fontSize: 15 },
   previewStackWrap: {
     width: 230,
@@ -741,7 +741,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#ded8ec',
-    backgroundColor: '#ebe7f5'
+    backgroundColor: '#F1D9DF'
   },
   placeholderCard: {
     alignItems: 'center',
@@ -750,12 +750,12 @@ const styles = StyleSheet.create({
     gap: 8
   },
   placeholderText: {
-    color: '#4f4865',
+    color: '#6B6467',
     fontWeight: '600',
     textAlign: 'center'
   },
   placeholderHint: {
-    color: '#7a7490',
+    color: '#6B6467',
     textAlign: 'center',
     fontSize: 12
   },
@@ -764,7 +764,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd8ea',
     borderRadius: 14,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     padding: 16,
     gap: 6
   },
@@ -772,27 +772,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0dbee',
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  recentSessionName: { color: '#2e2841', fontWeight: '700', fontSize: 16 },
-  recentSessionMeta: { color: '#746e89', marginTop: 3, fontSize: 12 },
-  recentSessionArrow: { fontSize: 26, color: '#9a93b0' },
+  recentSessionName: { color: '#2E2A2B', fontWeight: '700', fontSize: 16 },
+  recentSessionMeta: { color: '#6B6467', marginTop: 3, fontSize: 12 },
+  recentSessionArrow: { fontSize: 26, color: '#A8A1A4' },
   primaryButton: {
     marginTop: 8,
     width: '100%',
     maxWidth: 260,
-    backgroundColor: '#a3a1ab',
+    backgroundColor: '#D8A7B1',
     borderRadius: 22,
     paddingVertical: 12,
     alignItems: 'center'
   },
   primaryButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 16
   },
@@ -800,12 +800,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#d1cbe4',
+    borderColor: '#E9E4E6',
     borderRadius: 20,
     paddingVertical: 11,
     alignItems: 'center'
   },
-  secondaryButtonText: { color: '#5b536f', fontWeight: '700' },
+  secondaryButtonText: { color: '#6B6467', fontWeight: '700' },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(22, 17, 38, 0.4)',
@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
   },
   dismissArea: { flex: 1 },
   modalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
@@ -821,33 +821,33 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 10
   },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#2e2940' },
-  modalSubtitle: { color: '#716b86', marginBottom: 6 },
-  fieldLabel: { color: '#4f4a63', fontWeight: '600' },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#2E2A2B' },
+  modalSubtitle: { color: '#6B6467', marginBottom: 6 },
+  fieldLabel: { color: '#6B6467', fontWeight: '600' },
   input: {
     borderWidth: 1,
-    borderColor: '#d8d4e5',
+    borderColor: '#E9E4E6',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#2f2a41'
+    color: '#2E2A2B'
   },
   swipeStage: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 24 },
-  sessionName: { textAlign: 'center', fontSize: 24, fontWeight: '700', color: '#37304a' },
+  sessionName: { textAlign: 'center', fontSize: 24, fontWeight: '700', color: '#2E2A2B' },
   sessionCounter: { textAlign: 'center', color: '#7a728f', marginTop: 4 },
   deckArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   swipeCard: {
     width: '100%',
     maxWidth: 340,
     borderRadius: 18,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#ddd8ec',
+    borderColor: '#E9E4E6',
     overflow: 'hidden'
   },
-  swipeImage: { width: '100%', aspectRatio: 0.72, backgroundColor: '#e6e2f3' },
+  swipeImage: { width: '100%', aspectRatio: 0.72, backgroundColor: '#F2E6D8' },
   cardBody: { padding: 14, gap: 6 },
-  cardName: { fontSize: 18, fontWeight: '700', color: '#37304a' },
+  cardName: { fontSize: 18, fontWeight: '700', color: '#2E2A2B' },
   controlsRow: { flexDirection: 'row', justifyContent: 'center', gap: 20 },
   controlButton: {
     width: 58,
@@ -856,37 +856,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  rejectButton: { backgroundColor: '#ffe8ec' },
-  superButton: { backgroundColor: '#e5ecff' },
-  likeButton: { backgroundColor: '#e5f6ee' },
+  rejectButton: { backgroundColor: '#F1D9DF' },
+  superButton: { backgroundColor: '#F2E6D8' },
+  likeButton: { backgroundColor: '#F2E6D8' },
   controlText: { fontSize: 26, color: '#4a415f', fontWeight: '700' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#39324d' },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#2E2A2B' },
   resultsStage: { flex: 1 },
-  tabsRow: { flexDirection: 'row', marginHorizontal: 20, marginTop: 16, backgroundColor: '#e9e5f2', borderRadius: 14, padding: 3 },
+  tabsRow: { flexDirection: 'row', marginHorizontal: 20, marginTop: 16, backgroundColor: '#F1D9DF', borderRadius: 14, padding: 3 },
   tabButton: { flex: 1, borderRadius: 11, paddingVertical: 8, alignItems: 'center' },
-  tabButtonActive: { backgroundColor: '#fff' },
-  tabText: { color: '#645d79', fontWeight: '600' },
-  tabTextActive: { color: '#332c47' },
+  tabButtonActive: { backgroundColor: '#FFFFFF' },
+  tabText: { color: '#6B6467', fontWeight: '600' },
+  tabTextActive: { color: '#2E2A2B' },
   resultsContent: { paddingHorizontal: 20, paddingVertical: 14, gap: 12, paddingBottom: 30 },
-  resultsTitle: { fontSize: 21, fontWeight: '700', color: '#342d49' },
-  resultsSubtitle: { color: '#7c748f' },
+  resultsTitle: { fontSize: 21, fontWeight: '700', color: '#2E2A2B' },
+  resultsSubtitle: { color: '#6B6467' },
   analyticsCategorySection: { gap: 8 },
   analyticsCategoryTitle: { color: '#3d3652', fontWeight: '700' },
   analyticsRow: { gap: 6 },
   analyticsHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   analyticsTag: { color: '#443d5c', fontWeight: '600' },
-  analyticsScore: { color: '#6c6482', fontWeight: '600' },
-  analyticsBarTrack: { flexDirection: 'row', height: 10, width: '100%', borderRadius: 5, overflow: 'hidden', backgroundColor: '#ebe7f5' },
-  analyticsBarLike: { backgroundColor: '#92c9b8', height: '100%' },
-  analyticsBarDislike: { backgroundColor: '#e8a0a4', height: '100%' },
+  analyticsScore: { color: '#6B6467', fontWeight: '600' },
+  analyticsBarTrack: { flexDirection: 'row', height: 10, width: '100%', borderRadius: 5, overflow: 'hidden', backgroundColor: '#F1D9DF' },
+  analyticsBarLike: { backgroundColor: '#D8A7B1', height: '100%' },
+  analyticsBarDislike: { backgroundColor: '#D4AF7F', height: '100%' },
   rankingCard: {
     flexDirection: 'row',
     gap: 12,
     borderWidth: 1,
     borderColor: '#e0daee',
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     padding: 10
   },
   rankingImage: { width: 72, height: 96, borderRadius: 8, backgroundColor: '#e5e1f1' },

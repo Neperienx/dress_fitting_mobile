@@ -300,26 +300,26 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f7f6fb' },
+  container: { flex: 1, backgroundColor: '#F8F5F7' },
   content: { padding: 16, gap: 12 },
-  storeName: { fontSize: 28, fontWeight: '700', color: '#211f35' },
-  storeCity: { color: '#6f6a80', marginTop: -4 },
+  storeName: { fontSize: 28, fontWeight: '700', color: '#2E2A2B' },
+  storeCity: { color: '#6B6467', marginTop: -4 },
   searchInput: {
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#dedbe9',
-    backgroundColor: '#f0eef6',
+    borderColor: '#E9E4E6',
+    backgroundColor: '#F8F5F7',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#312e43'
+    color: '#2E2A2B'
   },
   sectionList: { marginTop: 4, gap: 10 },
   sectionCard: {
     borderWidth: 1,
-    borderColor: '#e5e2ef',
+    borderColor: '#E9E4E6',
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 12,
     paddingHorizontal: 12,
     flexDirection: 'row',
@@ -327,47 +327,47 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between'
   },
   sectionTextWrap: { flex: 1, paddingRight: 10 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#2a2739' },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#2E2A2B' },
   sectionSubtitle: { marginTop: 4, color: '#726d83' },
-  chevron: { fontSize: 28, lineHeight: 28, color: '#9691a7' },
+  chevron: { fontSize: 28, lineHeight: 28, color: '#A8A1A4' },
   overlayBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(16, 14, 25, 0.36)',
     justifyContent: 'flex-end'
   },
   overlayCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     padding: 20,
     gap: 12
   },
-  overlayTitle: { fontSize: 20, fontWeight: '700', color: '#241f35' },
+  overlayTitle: { fontSize: 20, fontWeight: '700', color: '#2E2A2B' },
   overlayBody: { color: '#5a566b', lineHeight: 20 },
-  insightsTabs: { flexDirection: 'row', borderRadius: 11, backgroundColor: '#ece8f6', padding: 3, gap: 4 },
+  insightsTabs: { flexDirection: 'row', borderRadius: 11, backgroundColor: '#F1D9DF', padding: 3, gap: 4 },
   insightsTabButton: { flex: 1, borderRadius: 8, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10 },
-  insightsTabButtonActive: { backgroundColor: '#fff' },
-  insightsTabText: { fontWeight: '600', color: '#605a74', fontSize: 12 },
+  insightsTabButtonActive: { backgroundColor: '#FFFFFF' },
+  insightsTabText: { fontWeight: '600', color: '#6B6467', fontSize: 12 },
   insightsTabTextActive: { color: '#2c263f' },
   insightsSectionWrap: { gap: 10 },
   insightCard: { borderWidth: 1, borderColor: '#ece8f5', borderRadius: 12, padding: 12, gap: 5 },
-  insightTitle: { fontWeight: '700', color: '#352f47' },
-  insightValue: { fontSize: 16, fontWeight: '700', color: '#241f35' },
+  insightTitle: { fontWeight: '700', color: '#2E2A2B' },
+  insightValue: { fontSize: 16, fontWeight: '700', color: '#2E2A2B' },
   insightMeta: { color: '#6f6a81', fontSize: 12 },
   analyticsRow: { gap: 5 },
   analyticsHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   analyticsTag: { color: '#413b57', fontWeight: '600' },
-  analyticsScore: { color: '#6f6982', fontWeight: '600' },
+  analyticsScore: { color: '#6B6467', fontWeight: '600' },
   analyticsBarTrack: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: '#ede9f6' },
-  analyticsBarLike: { backgroundColor: '#92c9b8' },
-  analyticsBarDislike: { backgroundColor: '#e8a0a4' },
+  analyticsBarLike: { backgroundColor: '#D8A7B1' },
+  analyticsBarDislike: { backgroundColor: '#D4AF7F' },
   closeButton: {
     marginTop: 6,
     alignSelf: 'flex-end',
-    backgroundColor: '#7b7496',
+    backgroundColor: '#C38D9E',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 9
   },
-  closeButtonText: { color: '#fff', fontWeight: '700' }
+  closeButtonText: { color: '#FFFFFF', fontWeight: '700' }
 });

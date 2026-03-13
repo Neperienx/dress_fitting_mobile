@@ -152,27 +152,27 @@ export default function StoresScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f7f6fb' },
+  container: { flex: 1, backgroundColor: '#F8F5F7' },
   content: { padding: 16, gap: 12 },
-  title: { fontSize: 28, fontWeight: '700', color: '#211f35' },
+  title: { fontSize: 28, fontWeight: '700', color: '#2E2A2B' },
   loadingContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24, gap: 8 },
-  loadingText: { color: '#6f6a80' },
+  loadingText: { color: '#6B6467' },
   tilesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   storeTile: {
     width: '47%',
     minHeight: 140,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#dfdcea',
-    backgroundColor: '#fff',
+    borderColor: '#E9E4E6',
+    backgroundColor: '#FFFFFF',
     padding: 12,
     justifyContent: 'space-between'
   },
   addTile: { alignItems: 'center', justifyContent: 'center', gap: 8 },
   addIcon: { fontSize: 38, color: '#9d99ac' },
-  addLabel: { color: '#4f4a63', fontWeight: '600' },
+  addLabel: { color: '#6B6467', fontWeight: '600' },
   storeIcon: { fontSize: 38, color: '#b3afc2' },
-  storeName: { fontSize: 16, fontWeight: '600', color: '#2a2739' },
+  storeName: { fontSize: 16, fontWeight: '600', color: '#2E2A2B' },
   storeLocation: { color: '#746f86' },
   modalBackdrop: {
     flex: 1,
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end'
   },
   modalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 20,
@@ -201,5 +201,5 @@ const styles = StyleSheet.create({
   cancelButtonText: { color: '#3f3b52', fontWeight: '600' },
   saveButton: { backgroundColor: '#787194' },
   disabledButton: { opacity: 0.65 },
-  saveButtonText: { color: '#fff', fontWeight: '700' }
+  saveButtonText: { color: '#FFFFFF', fontWeight: '700' }
 });
