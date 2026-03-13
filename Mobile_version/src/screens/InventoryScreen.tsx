@@ -89,6 +89,17 @@ function isMissingInventorySchemaError(error: unknown) {
   return code === 'PGRST205' && (message.includes('public.dresses') || message.includes('public.dress_images'));
 }
 
+function isInventoryRlsError(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const code = 'code' in error && typeof error.code === 'string' ? error.code : null;
+  const message = 'message' in error && typeof error.message === 'string' ? error.message.toLowerCase() : '';
+
+  return code === '42501' && message.includes('row-level security policy');
+}
+
 function getInventorySchemaMissingMessage() {
   return 'Inventory tables are missing in your Supabase project. Run `npx supabase db push` (or `npx supabase db reset` for local dev) from `Mobile_version/`, then reload the app.';
 }
@@ -300,6 +311,14 @@ export default function InventoryScreen({ route }: Props) {
     } catch (error) {
       if (isMissingInventorySchemaError(error)) {
         Alert.alert('Could not save dress', getInventorySchemaMissingMessage());
+        return;
+      }
+
+      if (isInventoryRlsError(error)) {
+        Alert.alert(
+          'Could not save dress',
+          'Your account is missing permission to add dresses in this studio. Please sign out and sign in again. If the issue persists, apply the latest Supabase migrations from `Mobile_version/` with `npx supabase db push`.'
+        );
         return;
       }
 
