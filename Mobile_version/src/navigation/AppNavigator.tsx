@@ -16,6 +16,7 @@ import AlertsScreen from '../screens/AlertsScreen';
 import StoreDetailScreen from '../screens/StoreDetailScreen';
 import InventoryScreen from '../screens/InventoryScreen';
 import DressProfileScreen from '../screens/DressProfileScreen';
+import StoreRecentSessionsScreen from '../screens/StoreRecentSessionsScreen';
 
 type AuthStackParamList = {
   Login: undefined;
@@ -39,6 +40,10 @@ export type StoresStackParamList = {
     storeId: string;
     storeName: string;
     storeCity: string | null;
+  };
+  StoreRecentSessions: {
+    storeId: string;
+    storeName: string;
   };
   Inventory: {
     storeId: string;
@@ -122,6 +127,12 @@ function StoresNavigator() {
         name="StoreDetail"
         component={StoreDetailScreen}
         options={({ route }) => ({ title: route.params.storeName })}
+      />
+
+      <StoresStack.Screen
+        name="StoreRecentSessions"
+        component={StoreRecentSessionsScreen}
+        options={({ route }) => ({ title: `${route.params.storeName} Sessions` })}
       />
 
       <StoresStack.Screen

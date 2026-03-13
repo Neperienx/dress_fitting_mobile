@@ -37,16 +37,6 @@ const sections: MenuSection[] = [
   }
 ];
 
-function formatSessionDate(isoDate: string) {
-  const date = new Date(isoDate);
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-}
-
 export default function StoreDetailScreen({ navigation, route }: Props) {
   const { storeId, storeName, storeCity } = route.params;
   const [searchValue, setSearchValue] = useState('');
@@ -86,12 +76,12 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
     [sessionSubtitle]
   );
 
-  const navigateToRecentSessions = (sessionId?: string) => {
-    setActiveOverlay(null);
-    navigation.getParent()?.navigate('Session', { open: 'recent', sessionId });
-  };
-
   const handleSectionPress = (section: MenuSection) => {
+    if (section.key === 'sessions') {
+      navigation.navigate('StoreRecentSessions', { storeId, storeName });
+      return;
+    }
+
     if (section.key === 'inventory') {
       navigation.navigate('Inventory', { storeId, storeName });
       return;
@@ -232,31 +222,7 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
         <View style={styles.overlayBackdrop}>
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>{activeOverlay?.title}</Text>
-            {activeOverlay?.key === 'sessions' ? (
-              <>
-                {recentSessions.length === 0 ? (
-                  <Text style={styles.overlayBody}>No sessions yet. Start a session and it will appear here.</Text>
-                ) : (
-                  <View style={styles.overlayListWrap}>
-                    {recentSessions.slice(0, 4).map((session) => (
-                      <Pressable key={session.id} style={styles.overlaySessionRow} onPress={() => navigateToRecentSessions(session.id)}>
-                        <View>
-                          <Text style={styles.overlaySessionName}>{session.brideName || 'Untitled session'}</Text>
-                          <Text style={styles.overlaySessionMeta}>{formatSessionDate(session.endedAt)}</Text>
-                        </View>
-                        <Text style={styles.overlaySessionArrow}>›</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-
-                <Pressable style={styles.primaryAction} onPress={() => navigateToRecentSessions()}>
-                  <Text style={styles.primaryActionText}>Open Recent Sessions tab</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                {activeOverlay?.key === 'insights' ? (
+            {activeOverlay?.key === 'insights' ? (
                   <>
                     <View style={styles.insightsTabs}>
                       <Pressable style={[styles.insightsTabButton, insightsTab === 'overview' && styles.insightsTabButtonActive]} onPress={() => setInsightsTab('overview')}>
@@ -325,19 +291,7 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
                       <Text style={styles.closeButtonText}>Close</Text>
                     </Pressable>
                   </>
-                ) : (
-                  <>
-                    <Text style={styles.overlayBody}>
-                      This is a placeholder overlay for {activeOverlay?.title?.toLowerCase()}. You can attach actions, forms, or analytics
-                      here.
-                    </Text>
-                    <Pressable style={styles.closeButton} onPress={() => setActiveOverlay(null)}>
-                      <Text style={styles.closeButtonText}>Close</Text>
-                    </Pressable>
-                  </>
-                )}
-              </>
-            )}
+                ) : null}
           </View>
         </View>
       </Modal>
@@ -390,20 +344,6 @@ const styles = StyleSheet.create({
   },
   overlayTitle: { fontSize: 20, fontWeight: '700', color: '#241f35' },
   overlayBody: { color: '#5a566b', lineHeight: 20 },
-  overlayListWrap: { gap: 8 },
-  overlaySessionRow: {
-    borderWidth: 1,
-    borderColor: '#ece8f5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  overlaySessionName: { color: '#312c45', fontWeight: '700' },
-  overlaySessionMeta: { color: '#716b86', marginTop: 2, fontSize: 12 },
-  overlaySessionArrow: { fontSize: 24, color: '#9e97b4' },
   insightsTabs: { flexDirection: 'row', borderRadius: 11, backgroundColor: '#ece8f6', padding: 3, gap: 4 },
   insightsTabButton: { flex: 1, borderRadius: 8, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10 },
   insightsTabButtonActive: { backgroundColor: '#fff' },
@@ -421,17 +361,8 @@ const styles = StyleSheet.create({
   analyticsBarTrack: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: '#ede9f6' },
   analyticsBarLike: { backgroundColor: '#92c9b8' },
   analyticsBarDislike: { backgroundColor: '#e8a0a4' },
-  primaryAction: {
-    marginTop: 6,
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    backgroundColor: '#7b7496',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11
-  },
-  primaryActionText: { color: '#fff', fontWeight: '700' },
   closeButton: {
+    marginTop: 6,
     alignSelf: 'flex-end',
     backgroundColor: '#7b7496',
     borderRadius: 10,
