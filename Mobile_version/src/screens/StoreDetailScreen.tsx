@@ -300,43 +300,48 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FEFAFC' },
-  content: { padding: 16, gap: 12 },
+  container: { flex: 1, backgroundColor: '#F5EFF3' },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28, gap: 16 },
   storeName: { fontSize: 28, fontWeight: '700', color: '#433A3F' },
   storeCity: { color: '#8B7E83', marginTop: -4 },
   searchInput: {
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#EFE5E9',
+    borderColor: '#E6D9DF',
     backgroundColor: '#FEFAFC',
     borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     color: '#433A3F'
   },
-  sectionList: { marginTop: 4, gap: 10 },
+  sectionList: { marginTop: 8, gap: 14 },
   sectionCard: {
     borderWidth: 1,
-    borderColor: '#EFE5E9',
+    borderColor: '#E6D9DF',
     borderRadius: 12,
-    backgroundColor: '#FFFCFD',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    shadowColor: '#2D1F26',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2
   },
   sectionTextWrap: { flex: 1, paddingRight: 10 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#433A3F' },
   sectionSubtitle: { marginTop: 4, color: '#958A90' },
-  chevron: { fontSize: 28, lineHeight: 28, color: '#B8ABAF' },
+  chevron: { fontSize: 28, lineHeight: 28, color: '#A4959B' },
   overlayBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(33, 22, 29, 0.22)',
     justifyContent: 'flex-end'
   },
   overlayCard: {
-    backgroundColor: '#FFFCFD',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     padding: 20,
@@ -359,8 +364,8 @@ const styles = StyleSheet.create({
   analyticsTag: { color: '#64585D', fontWeight: '600' },
   analyticsScore: { color: '#8B7E83', fontWeight: '600' },
   analyticsBarTrack: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: '#F2E8EC' },
-  analyticsBarLike: { backgroundColor: '#DEA9B6' },
-  analyticsBarDislike: { backgroundColor: '#E8CFA8' },
+  analyticsBarLike: { backgroundColor: '#2EAF64' },
+  analyticsBarDislike: { backgroundColor: '#D94D4D' },
   closeButton: {
     marginTop: 6,
     alignSelf: 'flex-end',
