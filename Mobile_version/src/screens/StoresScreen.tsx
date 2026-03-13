@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
@@ -14,57 +14,19 @@ import {
 } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
+import { useStore } from '../context/StoreContext';
 import { assertSupabaseConfigured, supabase } from '../lib/supabase';
 import { StoresStackParamList } from '../navigation/AppNavigator';
-
-type Store = {
-  id: string;
-  name: string;
-  city: string | null;
-};
 
 type Props = NativeStackScreenProps<StoresStackParamList, 'StoresList'>;
 
 export default function StoresScreen({ navigation }: Props) {
   const { session } = useAuth();
-  const [stores, setStores] = useState<Store[]>([]);
-  const [loadingStores, setLoadingStores] = useState(true);
+  const { stores, loadingStores, refreshStores, selectStore } = useStore();
   const [showCreateStoreModal, setShowCreateStoreModal] = useState(false);
   const [storeName, setStoreName] = useState('');
   const [storeLocation, setStoreLocation] = useState('');
   const [savingStore, setSavingStore] = useState(false);
-
-  const loadStores = useCallback(async () => {
-    if (!session?.user.id) {
-      setStores([]);
-      setLoadingStores(false);
-      return;
-    }
-
-    try {
-      assertSupabaseConfigured();
-      setLoadingStores(true);
-      const { data, error } = await supabase
-        .from('studios')
-        .select('id, name, city')
-        .eq('owner_id', session.user.id)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      setStores(data ?? []);
-    } catch (error) {
-      Alert.alert('Could not load stores', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setLoadingStores(false);
-    }
-  }, [session?.user.id]);
-
-  useEffect(() => {
-    void loadStores();
-  }, [loadStores]);
 
   const createStore = useCallback(async () => {
     const trimmedName = storeName.trim();
@@ -96,13 +58,13 @@ export default function StoresScreen({ navigation }: Props) {
       setStoreName('');
       setStoreLocation('');
       setShowCreateStoreModal(false);
-      await loadStores();
+      await refreshStores();
     } catch (error) {
       Alert.alert('Could not create store', error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setSavingStore(false);
     }
-  }, [loadStores, session?.user.id, storeLocation, storeName]);
+  }, [refreshStores, session?.user.id, storeLocation, storeName]);
 
   const storeTiles = useMemo(
     () =>
@@ -110,13 +72,14 @@ export default function StoresScreen({ navigation }: Props) {
         <Pressable
           key={store.id}
           style={styles.storeTile}
-          onPress={() =>
+          onPress={async () => {
+            await selectStore(store.id);
             navigation.navigate('StoreDetail', {
               storeId: store.id,
               storeName: store.name,
               storeCity: store.city
-            })
-          }
+            });
+          }}
         >
           <Text style={styles.storeIcon}>🏬</Text>
           <Text numberOfLines={2} style={styles.storeName}>
@@ -127,7 +90,7 @@ export default function StoresScreen({ navigation }: Props) {
           </Text>
         </Pressable>
       )),
-    [navigation, stores]
+    [navigation, selectStore, stores]
   );
 
   return (
