@@ -22,6 +22,10 @@ import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { assertSupabaseConfigured, supabase } from '../lib/supabase';
 
+const englishTagCatalog = require('../data/dress-tags.en.json') as {
+  categories?: Array<{ name: string; tags: string[] }>;
+};
+
 type SessionPreviewDress = {
   id: string;
   name: string | null;
@@ -314,6 +318,25 @@ export default function SessionScreen() {
     [tagScores]
   );
 
+  const tagsByCategory = useMemo(() => {
+    const categoryByTag = new Map<string, string>();
+    (englishTagCatalog.categories ?? []).forEach((category) => {
+      category.tags.forEach((tag) => {
+        categoryByTag.set(tag, category.name);
+      });
+    });
+
+    const grouped = new Map<string, Array<(typeof rankedTags)[number]>>();
+    rankedTags.forEach((tagRow) => {
+      const category = categoryByTag.get(tagRow.tag) ?? 'Other';
+      const rows = grouped.get(category) ?? [];
+      rows.push(tagRow);
+      grouped.set(category, rows);
+    });
+
+    return Array.from(grouped.entries()).map(([category, tags]) => ({ category, tags }));
+  }, [rankedTags]);
+
   const renderLanding = () => (
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.title}>Start Session</Text>
@@ -386,7 +409,6 @@ export default function SessionScreen() {
             )}
             <View style={styles.cardBody}>
               <Text style={styles.cardName}>{currentDress.name || 'Untitled dress'}</Text>
-              <Text style={styles.cardTags}>Tags: {currentDress.tags.length > 0 ? currentDress.tags.join(', ') : 'No tags yet'}</Text>
             </View>
           </Animated.View>
         </View>
@@ -413,27 +435,32 @@ export default function SessionScreen() {
         {Object.keys(dressDecisions).length} swiped / {sessionQueue.length} chosen dresses
       </Text>
 
-      {rankedTags.length === 0 ? (
+      {tagsByCategory.length === 0 ? (
         <Text style={styles.placeholderHint}>No tag analytics available. Add tags to dresses in inventory.</Text>
       ) : (
-        rankedTags.map((tagRow) => {
-          const total = Math.max(tagRow.likes + tagRow.dislikes, 1);
-          const likeWidth = `${(tagRow.likes / total) * 100}%`;
-          const dislikeWidth = `${(tagRow.dislikes / total) * 100}%`;
+        tagsByCategory.map((group) => (
+          <View key={group.category} style={styles.analyticsCategorySection}>
+            <Text style={styles.analyticsCategoryTitle}>{group.category}</Text>
+            {group.tags.map((tagRow) => {
+              const total = Math.max(tagRow.likes + tagRow.dislikes, 1);
+              const likeWidth = `${(tagRow.likes / total) * 100}%`;
+              const dislikeWidth = `${(tagRow.dislikes / total) * 100}%`;
 
-          return (
-            <View key={tagRow.tag} style={styles.analyticsRow}>
-              <View style={styles.analyticsHeader}>
-                <Text style={styles.analyticsTag}>{tagRow.tag}</Text>
-                <Text style={styles.analyticsScore}>Score {tagRow.score}</Text>
-              </View>
-              <View style={styles.analyticsBarTrack}>
-                <View style={[styles.analyticsBarLike, { width: likeWidth }]} />
-                <View style={[styles.analyticsBarDislike, { width: dislikeWidth }]} />
-              </View>
-            </View>
-          );
-        })
+              return (
+                <View key={tagRow.tag} style={styles.analyticsRow}>
+                  <View style={styles.analyticsHeader}>
+                    <Text style={styles.analyticsTag}>{tagRow.tag}</Text>
+                    <Text style={styles.analyticsScore}>Score {tagRow.score}</Text>
+                  </View>
+                  <View style={styles.analyticsBarTrack}>
+                    <View style={[styles.analyticsBarLike, { width: likeWidth }]} />
+                    <View style={[styles.analyticsBarDislike, { width: dislikeWidth }]} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ))
       )}
     </ScrollView>
   );
@@ -453,7 +480,6 @@ export default function SessionScreen() {
                 #{index + 1} {entry.dress.name || 'Untitled dress'}
               </Text>
               <Text style={styles.rankingScore}>Score: {entry.score}</Text>
-              <Text style={styles.rankingTags}>{entry.dress.tags.length ? entry.dress.tags.join(', ') : 'No tags assigned'}</Text>
               {decision ? <Text style={styles.decisionPill}>Session action: {decision}</Text> : null}
             </View>
           </View>
@@ -638,7 +664,6 @@ const styles = StyleSheet.create({
   swipeImage: { width: '100%', aspectRatio: 0.72, backgroundColor: '#e6e2f3' },
   cardBody: { padding: 14, gap: 6 },
   cardName: { fontSize: 18, fontWeight: '700', color: '#37304a' },
-  cardTags: { color: '#6d6584' },
   controlsRow: { flexDirection: 'row', justifyContent: 'center', gap: 20 },
   controlButton: {
     width: 58,
@@ -662,6 +687,8 @@ const styles = StyleSheet.create({
   resultsContent: { paddingHorizontal: 20, paddingVertical: 14, gap: 12, paddingBottom: 30 },
   resultsTitle: { fontSize: 21, fontWeight: '700', color: '#342d49' },
   resultsSubtitle: { color: '#7c748f' },
+  analyticsCategorySection: { gap: 8 },
+  analyticsCategoryTitle: { color: '#3d3652', fontWeight: '700' },
   analyticsRow: { gap: 6 },
   analyticsHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   analyticsTag: { color: '#443d5c', fontWeight: '600' },
@@ -682,6 +709,5 @@ const styles = StyleSheet.create({
   rankingBody: { flex: 1, gap: 4 },
   rankingName: { color: '#322b46', fontWeight: '700' },
   rankingScore: { color: '#554d6a', fontWeight: '600' },
-  rankingTags: { color: '#6d6584', fontSize: 12 },
   decisionPill: { color: '#4c4463', fontSize: 12, fontWeight: '600' }
 });
