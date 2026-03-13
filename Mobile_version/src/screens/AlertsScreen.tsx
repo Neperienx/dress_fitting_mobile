@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 8,
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     color: '#2d2840'
   },
   alertCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#ebe8f4',
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   emptyCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ebe8f4',
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(26, 22, 41, 0.45)'
   },
   modalSheet: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     paddingHorizontal: 18,
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   modalPrimaryButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontWeight: '600'
   }
 });

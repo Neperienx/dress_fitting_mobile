@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, justifyContent: 'center', gap: 12 },
   title: { fontSize: 30, fontWeight: '700' },
   subtitle: { fontSize: 16 },
-  body: { color: '#555' },
-  button: { backgroundColor: '#111', borderRadius: 8, padding: 12, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: '600' }
+  body: { color: '#6B6467' },
+  button: { backgroundColor: '#C38D9E', borderRadius: 8, padding: 12, alignItems: 'center' },
+  buttonText: { color: '#FFFFFF', fontWeight: '600' }
 });

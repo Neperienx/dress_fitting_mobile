@@ -82,16 +82,16 @@ export default function StoreRecentSessionsScreen({ navigation, route }: Props) 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f7f6fb' },
+  container: { flex: 1, backgroundColor: '#F8F5F7' },
   content: { padding: 16, gap: 12 },
   searchInput: {
     borderWidth: 1,
-    borderColor: '#dedbe9',
-    backgroundColor: '#f0eef6',
+    borderColor: '#E9E4E6',
+    backgroundColor: '#F8F5F7',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#312e43'
+    color: '#2E2A2B'
   },
   tilesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   sessionTile: {
@@ -99,22 +99,22 @@ const styles = StyleSheet.create({
     minHeight: 148,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e3dff0',
-    backgroundColor: '#fff',
+    borderColor: '#E9E4E6',
+    backgroundColor: '#FFFFFF',
     padding: 12,
     justifyContent: 'space-between'
   },
   sessionName: { color: '#2b2740', fontWeight: '700', fontSize: 16 },
-  sessionMeta: { color: '#756f89', fontSize: 12 },
+  sessionMeta: { color: '#6B6467', fontSize: 12 },
   openLabel: { color: '#61597b', fontWeight: '600', marginTop: 8 },
   emptyState: {
     borderWidth: 1,
-    borderColor: '#e4e1ee',
+    borderColor: '#E9E4E6',
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     padding: 14,
     gap: 4
   },
-  emptyStateTitle: { color: '#29253e', fontWeight: '700' },
-  emptyStateBody: { color: '#6f6a80' }
+  emptyStateTitle: { color: '#2E2A2B', fontWeight: '700' },
+  emptyStateBody: { color: '#6B6467' }
 });

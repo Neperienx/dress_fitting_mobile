@@ -175,7 +175,7 @@ export default function DressProfileScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f7f6fb' },
+  container: { flex: 1, backgroundColor: '#F8F5F7' },
   content: { flex: 1, padding: 20, gap: 16 },
   title: { textAlign: 'center', fontSize: 28, fontWeight: '600', color: '#625d73' },
   card: {
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d8d4e7'
   },
-  imageWrap: { width: '100%', aspectRatio: 0.7, borderRadius: 14, overflow: 'hidden', backgroundColor: '#ddd8ec' },
+  imageWrap: { width: '100%', aspectRatio: 0.7, borderRadius: 14, overflow: 'hidden', backgroundColor: '#E9E4E6' },
   image: { width: '100%', height: '100%' },
   overlayRow: { ...StyleSheet.absoluteFillObject, flexDirection: 'row' },
   navZone: { flex: 1 },
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     backgroundColor: 'rgba(84, 79, 101, 0.66)'
   },
-  counterText: { color: '#fff', fontWeight: '600' },
+  counterText: { color: '#FFFFFF', fontWeight: '600' },
   dotsRow: {
     position: 'absolute',
     bottom: 12,
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.5)' },
-  activeDot: { backgroundColor: '#fff' },
+  activeDot: { backgroundColor: '#FFFFFF' },
   placeholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: '#78708f' },
   selectedTagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   dismissArea: { flex: 1 },
   sheet: {
     maxHeight: '72%',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     paddingHorizontal: 18,
@@ -237,10 +237,10 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 12
   },
-  sheetTitle: { fontSize: 18, fontWeight: '700', color: '#302a45' },
+  sheetTitle: { fontSize: 18, fontWeight: '700', color: '#2E2A2B' },
   previewRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  miniPreview: { width: 56, height: 72, borderRadius: 8, backgroundColor: '#ddd8ec' },
-  previewName: { color: '#4d4761', fontSize: 15, fontWeight: '600' },
+  miniPreview: { width: 56, height: 72, borderRadius: 8, backgroundColor: '#E9E4E6' },
+  previewName: { color: '#6B6467', fontSize: 15, fontWeight: '600' },
   categoriesWrap: { gap: 16, paddingBottom: 20 },
   categorySection: { gap: 10 },
   categoryTitle: { color: '#3f3857', fontSize: 14, fontWeight: '700' },
@@ -248,12 +248,12 @@ const styles = StyleSheet.create({
   tagChip: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#cfc8e5',
+    borderColor: '#E9E4E6',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#f6f4fc'
+    backgroundColor: '#F8F5F7'
   },
-  tagChipActive: { backgroundColor: '#6d63b8', borderColor: '#6d63b8' },
-  tagChipText: { color: '#5b5476', fontWeight: '600' },
-  tagChipTextActive: { color: '#fff' }
+  tagChipActive: { backgroundColor: '#D8A7B1', borderColor: '#D8A7B1' },
+  tagChipText: { color: '#6B6467', fontWeight: '600' },
+  tagChipTextActive: { color: '#FFFFFF' }
 });

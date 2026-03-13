@@ -455,29 +455,29 @@ export default function InventoryScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f7f6fb' },
+  container: { flex: 1, backgroundColor: '#F8F5F7' },
   content: { padding: 16, gap: 12 },
-  title: { fontSize: 28, fontWeight: '700', color: '#211f35' },
+  title: { fontSize: 28, fontWeight: '700', color: '#2E2A2B' },
   loadingContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24, gap: 8 },
-  loadingText: { color: '#6f6a80' },
+  loadingText: { color: '#6B6467' },
   tilesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   dressTile: {
     width: '47%',
     minHeight: 170,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#dfdcea',
-    backgroundColor: '#fff',
+    borderColor: '#E9E4E6',
+    backgroundColor: '#FFFFFF',
     padding: 10,
     gap: 6
   },
   addTile: { alignItems: 'center', justifyContent: 'center', gap: 8 },
   addIcon: { fontSize: 38, color: '#9d99ac' },
-  addLabel: { color: '#4f4a63', fontWeight: '600' },
+  addLabel: { color: '#6B6467', fontWeight: '600' },
   dressImage: { width: '100%', height: 88, borderRadius: 8, backgroundColor: '#e9e6f3' },
   imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   imagePlaceholderText: { color: '#7e7892' },
-  dressName: { fontSize: 15, fontWeight: '600', color: '#2a2739' },
+  dressName: { fontSize: 15, fontWeight: '600', color: '#2E2A2B' },
   dressMeta: { color: '#746f86', fontSize: 12 },
   modalBackdrop: {
     flex: 1,
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end'
   },
   modalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 20,
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: '#faf9ff'
   },
-  photoSectionLabel: { color: '#4f4a63', fontWeight: '600', marginTop: 2 },
+  photoSectionLabel: { color: '#6B6467', fontWeight: '600', marginTop: 2 },
   photoSectionHint: { color: '#7b7690', fontSize: 12, marginTop: -2, marginBottom: 2 },
   photoButtonRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   photoPickerButton: {
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
   },
   filesButton: { backgroundColor: '#5f61cd' },
   galleryButton: { backgroundColor: '#8f46c8' },
-  photoPickerButtonText: { color: '#fff', fontWeight: '700' },
+  photoPickerButtonText: { color: '#FFFFFF', fontWeight: '700' },
   previewContainer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   previewStack: { width: 54, height: 58, justifyContent: 'center', alignItems: 'center' },
   previewPhoto: {
@@ -536,5 +536,5 @@ const styles = StyleSheet.create({
   cancelButtonText: { color: '#3f3b52', fontWeight: '600' },
   saveButton: { backgroundColor: '#787194' },
   disabledButton: { opacity: 0.65 },
-  saveButtonText: { color: '#fff', fontWeight: '700' }
+  saveButtonText: { color: '#FFFFFF', fontWeight: '700' }
 });
