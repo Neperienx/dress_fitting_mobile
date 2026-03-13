@@ -120,7 +120,7 @@ function loadDocumentPickerModule(): MaybeDocumentPickerModule | null {
   }
 }
 
-export default function InventoryScreen({ route }: Props) {
+export default function InventoryScreen({ route, navigation }: Props) {
   const { session } = useAuth();
   const { storeId, storeName } = route.params;
 
@@ -341,7 +341,11 @@ export default function InventoryScreen({ route }: Props) {
         const leadImage = dress.dress_images[0]?.image_url;
 
         return (
-          <View key={dress.id} style={styles.dressTile}>
+          <Pressable
+            key={dress.id}
+            style={styles.dressTile}
+            onPress={() => navigation.navigate('DressProfile', { storeId, storeName, dress })}
+          >
             {leadImage ? (
               <Image source={{ uri: leadImage }} style={styles.dressImage} resizeMode="cover" />
             ) : (
@@ -354,10 +358,10 @@ export default function InventoryScreen({ route }: Props) {
             </Text>
             <Text style={styles.dressMeta}>{dress.price ? `$${dress.price.toFixed(2)}` : 'No price'}</Text>
             <Text style={styles.dressMeta}>{dress.dress_images.length} photo(s)</Text>
-          </View>
+          </Pressable>
         );
       }),
-    [dresses]
+    [dresses, navigation, storeId, storeName]
   );
 
   return (

@@ -14,6 +14,7 @@ import StoresScreen from '../screens/StoresScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import StoreDetailScreen from '../screens/StoreDetailScreen';
 import InventoryScreen from '../screens/InventoryScreen';
+import DressProfileScreen from '../screens/DressProfileScreen';
 
 type AuthStackParamList = {
   Login: undefined;
@@ -39,6 +40,21 @@ export type StoresStackParamList = {
     storeId: string;
     storeName: string;
   };
+  DressProfile: {
+    storeId: string;
+    storeName: string;
+    dress: {
+      id: string;
+      name: string | null;
+      price: number | null;
+      created_at: string;
+      dress_images: {
+        id: string;
+        image_url: string;
+        sort_order: number;
+      }[];
+    };
+  };
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -59,6 +75,12 @@ function StoresNavigator() {
         name="Inventory"
         component={InventoryScreen}
         options={({ route }) => ({ title: `${route.params.storeName} Inventory` })}
+      />
+
+      <StoresStack.Screen
+        name="DressProfile"
+        component={DressProfileScreen}
+        options={{ title: 'Dress Profile' }}
       />
     </StoresStack.Navigator>
   );
