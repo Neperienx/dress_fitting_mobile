@@ -16,36 +16,38 @@ import {
   TextInput,
   View
 } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { assertSupabaseConfigured, supabase } from '../lib/supabase';
+import { 
+  SavedSession,
+  SessionDress,
+  SessionPreviewDress,
+  SwipeDecision,
+  TagSummary,
+  loadSessionHistory,
+  prependSessionHistory
+} from '../utils/sessionHistory';
 
 const englishTagCatalog = require('../data/dress-tags.en.json') as {
   categories?: Array<{ name: string; tags: string[] }>;
 };
 
-type SessionPreviewDress = {
-  id: string;
-  name: string | null;
-  price: number | null;
-  created_at: string;
-  dress_images: { id: string; image_url: string; sort_order: number }[];
-};
-
-type SessionDress = SessionPreviewDress & {
-  tags: string[];
-};
-
-type SwipeDecision = 'like' | 'dislike' | 'superlike';
 type SessionStage = 'landing' | 'swiping' | 'results';
 type ResultsTab = 'analytics' | 'ranking';
-
-type TagSummary = {
-  likes: number;
-  dislikes: number;
-  score: number;
+type LandingTab = 'start' | 'recent';
+type AppTabsParamList = {
+  Home: undefined;
+  Session: {
+    open?: 'recent';
+    sessionId?: string;
+  } | undefined;
+  Stores: undefined;
+  Alerts: undefined;
 };
 
 function getTagStorageKey(dressId: string) {
@@ -99,7 +101,19 @@ function applyDecision(tagSummary: Record<string, TagSummary>, tags: string[], d
   });
 }
 
+function formatSessionDate(isoDate: string) {
+  const date = new Date(isoDate);
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
 export default function SessionScreen() {
+  const navigation = useNavigation<BottomTabNavigationProp<AppTabsParamList>>();
+  const route = useRoute<{ params?: { open?: 'recent'; sessionId?: string } }>();
   const { session } = useAuth();
   const { selectedStore } = useStore();
 
@@ -114,6 +128,10 @@ export default function SessionScreen() {
   const [activeTab, setActiveTab] = useState<ResultsTab>('analytics');
   const [tagScores, setTagScores] = useState<Record<string, TagSummary>>({});
   const [dressDecisions, setDressDecisions] = useState<Record<string, SwipeDecision>>({});
+  const [landingTab, setLandingTab] = useState<LandingTab>('start');
+  const [recentSessions, setRecentSessions] = useState<SavedSession[]>([]);
+  const [selectedHistorySession, setSelectedHistorySession] = useState<SavedSession | null>(null);
+  const [sessionSaved, setSessionSaved] = useState(false);
 
   const swipePosition = useRef(new Animated.ValueXY()).current;
 
@@ -175,6 +193,40 @@ export default function SessionScreen() {
   useEffect(() => {
     void loadInventoryDresses();
   }, [loadInventoryDresses]);
+
+  const loadRecentSessions = useCallback(async () => {
+    if (!selectedStore?.id) {
+      setRecentSessions([]);
+      return;
+    }
+
+    const sessions = await loadSessionHistory(selectedStore.id);
+    setRecentSessions(sessions);
+  }, [selectedStore?.id]);
+
+  useEffect(() => {
+    void loadRecentSessions();
+  }, [loadRecentSessions]);
+
+  useEffect(() => {
+    const params = route.params;
+
+    if (!params?.open || params.open !== 'recent') {
+      return;
+    }
+
+    setLandingTab('recent');
+    if (params.sessionId) {
+      const hit = recentSessions.find((entry) => entry.id === params.sessionId);
+      if (hit) {
+        setSelectedHistorySession(hit);
+        setSessionStage('results');
+        setActiveTab('analytics');
+      }
+    }
+
+    navigation.setParams({ open: undefined, sessionId: undefined });
+  }, [navigation, recentSessions, route]);
 
   const previewImages = useMemo(
     () => allStoreDresses.map(getPreviewImage).filter((image): image is string => Boolean(image)).slice(0, 3),
@@ -296,26 +348,79 @@ export default function SessionScreen() {
     setSwipeIndex(0);
     setTagScores({});
     setDressDecisions({});
+    setSelectedHistorySession(null);
+    setSessionSaved(false);
+    setLandingTab('start');
     setActiveTab('analytics');
     setShowSessionForm(false);
     setSessionStage('swiping');
   };
 
+  useEffect(() => {
+    if (sessionStage !== 'results' || sessionSaved || !selectedStore?.id || selectedHistorySession) {
+      return;
+    }
+
+    const record: SavedSession = {
+      id: `${Date.now()}`,
+      storeId: selectedStore.id,
+      brideName: brideName.trim() || 'Session',
+      endedAt: new Date().toISOString(),
+      sessionQueue,
+      allStoreDresses,
+      tagScores,
+      dressDecisions
+    };
+
+    void (async () => {
+      await prependSessionHistory(selectedStore.id, record);
+      setSessionSaved(true);
+      await loadRecentSessions();
+    })();
+  }, [
+    allStoreDresses,
+    brideName,
+    dressDecisions,
+    loadRecentSessions,
+    selectedHistorySession,
+    selectedStore?.id,
+    sessionQueue,
+    sessionSaved,
+    sessionStage,
+    tagScores
+  ]);
+
+  const activeSessionData = selectedHistorySession
+    ? {
+        brideName: selectedHistorySession.brideName,
+        sessionQueue: selectedHistorySession.sessionQueue,
+        allStoreDresses: selectedHistorySession.allStoreDresses,
+        tagScores: selectedHistorySession.tagScores,
+        dressDecisions: selectedHistorySession.dressDecisions
+      }
+    : {
+        brideName,
+        sessionQueue,
+        allStoreDresses,
+        tagScores,
+        dressDecisions
+      };
+
   const rankedDresses = useMemo(() => {
-    return [...allStoreDresses]
+    return [...activeSessionData.allStoreDresses]
       .map((dress) => ({
         dress,
-        score: dress.tags.reduce((total, tag) => total + (tagScores[tag]?.score ?? 0), 0)
+        score: dress.tags.reduce((total, tag) => total + (activeSessionData.tagScores[tag]?.score ?? 0), 0)
       }))
       .sort((a, b) => b.score - a.score);
-  }, [allStoreDresses, tagScores]);
+  }, [activeSessionData.allStoreDresses, activeSessionData.tagScores]);
 
   const rankedTags = useMemo(
     () =>
-      Object.entries(tagScores)
+      Object.entries(activeSessionData.tagScores)
         .sort((a, b) => b[1].score - a[1].score)
         .map(([tag, stats]) => ({ tag, ...stats })),
-    [tagScores]
+    [activeSessionData.tagScores]
   );
 
   const tagsByCategory = useMemo(() => {
@@ -339,44 +444,84 @@ export default function SessionScreen() {
 
   const renderLanding = () => (
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Start Session</Text>
-      <Text style={styles.subtitle}>Swipe to Discover Dresses</Text>
-
-      <View style={styles.previewStackWrap}>
-        {loadingPreview ? (
-          <View style={[styles.previewCard, styles.placeholderCard]}>
-            <ActivityIndicator color="#5b526f" />
-          </View>
-        ) : previewImages.length > 0 ? (
-          previewImages.map((image, index) => {
-            const layers = previewImages.length;
-            const reverseIndex = layers - index - 1;
-            return (
-              <View
-                key={`${image}-${index}`}
-                style={[
-                  styles.layer,
-                  {
-                    transform: [{ translateX: reverseIndex * 14 }, { translateY: reverseIndex * 6 }],
-                    zIndex: 5 - reverseIndex
-                  }
-                ]}
-              >
-                <Image source={{ uri: image }} style={styles.previewCard} resizeMode="cover" />
-              </View>
-            );
-          })
-        ) : (
-          <View style={[styles.previewCard, styles.placeholderCard]}>
-            <Text style={styles.placeholderText}>No inventory photos yet</Text>
-            <Text style={styles.placeholderHint}>Add dress photos in Inventory to power session previews.</Text>
-          </View>
-        )}
+      <View style={styles.landingTabs}>
+        <Pressable style={[styles.landingTabButton, landingTab === 'start' && styles.landingTabButtonActive]} onPress={() => setLandingTab('start')}>
+          <Text style={[styles.landingTabText, landingTab === 'start' && styles.landingTabTextActive]}>Start Session</Text>
+        </Pressable>
+        <Pressable style={[styles.landingTabButton, landingTab === 'recent' && styles.landingTabButtonActive]} onPress={() => setLandingTab('recent')}>
+          <Text style={[styles.landingTabText, landingTab === 'recent' && styles.landingTabTextActive]}>Recent Sessions</Text>
+        </Pressable>
       </View>
 
-      <Pressable style={styles.primaryButton} onPress={() => setShowSessionForm(true)}>
-        <Text style={styles.primaryButtonText}>Start Session</Text>
-      </Pressable>
+      {landingTab === 'start' ? (
+        <>
+          <Text style={styles.title}>Start Session</Text>
+          <Text style={styles.subtitle}>Swipe to Discover Dresses</Text>
+
+          <View style={styles.previewStackWrap}>
+            {loadingPreview ? (
+              <View style={[styles.previewCard, styles.placeholderCard]}>
+                <ActivityIndicator color="#5b526f" />
+              </View>
+            ) : previewImages.length > 0 ? (
+              previewImages.map((image, index) => {
+                const layers = previewImages.length;
+                const reverseIndex = layers - index - 1;
+                return (
+                  <View
+                    key={`${image}-${index}`}
+                    style={[
+                      styles.layer,
+                      {
+                        transform: [{ translateX: reverseIndex * 14 }, { translateY: reverseIndex * 6 }],
+                        zIndex: 5 - reverseIndex
+                      }
+                    ]}
+                  >
+                    <Image source={{ uri: image }} style={styles.previewCard} resizeMode="cover" />
+                  </View>
+                );
+              })
+            ) : (
+              <View style={[styles.previewCard, styles.placeholderCard]}>
+                <Text style={styles.placeholderText}>No inventory photos yet</Text>
+                <Text style={styles.placeholderHint}>Add dress photos in Inventory to power session previews.</Text>
+              </View>
+            )}
+          </View>
+
+          <Pressable style={styles.primaryButton} onPress={() => setShowSessionForm(true)}>
+            <Text style={styles.primaryButtonText}>Start Session</Text>
+          </Pressable>
+        </>
+      ) : (
+        <View style={styles.recentListWrap}>
+          {recentSessions.length === 0 ? (
+            <View style={styles.recentEmptyCard}>
+              <Text style={styles.placeholderText}>No recent sessions</Text>
+              <Text style={styles.placeholderHint}>Completed sessions will appear here with each bride's name.</Text>
+            </View>
+          ) : (
+            recentSessions.map((entry) => (
+              <Pressable
+                key={entry.id}
+                style={styles.recentSessionRow}
+                onPress={() => {
+                  setSelectedHistorySession(entry);
+                  setActiveTab('analytics');
+                  setSessionStage('results');
+                }}
+              >
+                <View>
+                  <Text style={styles.recentSessionName}>{entry.brideName}</Text>
+                  <Text style={styles.recentSessionMeta}>{formatSessionDate(entry.endedAt)}</Text>
+                </View>
+                <Text style={styles.recentSessionArrow}>›</Text>
+              </Pressable>
+            ))
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 
@@ -430,9 +575,9 @@ export default function SessionScreen() {
 
   const renderAnalyticsTab = () => (
     <ScrollView contentContainerStyle={styles.resultsContent}>
-      <Text style={styles.resultsTitle}>{brideName.trim() || 'Session'} analytics</Text>
+      <Text style={styles.resultsTitle}>{activeSessionData.brideName.trim() || 'Session'} analytics</Text>
       <Text style={styles.resultsSubtitle}>
-        {Object.keys(dressDecisions).length} swiped / {sessionQueue.length} chosen dresses
+        {Object.keys(activeSessionData.dressDecisions).length} swiped / {activeSessionData.sessionQueue.length} chosen dresses
       </Text>
 
       {tagsByCategory.length === 0 ? (
@@ -470,7 +615,7 @@ export default function SessionScreen() {
       <Text style={styles.resultsTitle}>Store ranking</Text>
       {rankedDresses.map((entry, index) => {
         const image = getPreviewImage(entry.dress);
-        const decision = dressDecisions[entry.dress.id];
+        const decision = activeSessionData.dressDecisions[entry.dress.id];
 
         return (
           <View key={entry.dress.id} style={styles.rankingCard}>
@@ -509,9 +654,11 @@ export default function SessionScreen() {
               setSessionStage('landing');
               setSwipeIndex(0);
               setSessionQueue([]);
+              setSelectedHistorySession(null);
+              setLandingTab('recent');
             }}
           >
-            <Text style={styles.secondaryButtonText}>Start New Session</Text>
+            <Text style={styles.secondaryButtonText}>{selectedHistorySession ? 'Back to Recent Sessions' : 'Start New Session'}</Text>
           </Pressable>
         </View>
       )}
@@ -556,11 +703,15 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 20,
     paddingVertical: 28,
     gap: 14
   },
+  landingTabs: { flexDirection: 'row', backgroundColor: '#e8e4f2', borderRadius: 14, padding: 3, width: '100%' },
+  landingTabButton: { flex: 1, borderRadius: 11, paddingVertical: 8, alignItems: 'center' },
+  landingTabButtonActive: { backgroundColor: '#fff' },
+  landingTabText: { color: '#645d79', fontWeight: '600' },
+  landingTabTextActive: { color: '#332c47' },
   title: { fontSize: 29, fontWeight: '700', color: '#302b41' },
   subtitle: { color: '#6d6880', fontSize: 15 },
   previewStackWrap: {
@@ -598,6 +749,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12
   },
+  recentListWrap: { width: '100%', gap: 10, marginTop: 4 },
+  recentEmptyCard: {
+    borderWidth: 1,
+    borderColor: '#ddd8ea',
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    padding: 16,
+    gap: 6
+  },
+  recentSessionRow: {
+    borderWidth: 1,
+    borderColor: '#e0dbee',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  recentSessionName: { color: '#2e2841', fontWeight: '700', fontSize: 16 },
+  recentSessionMeta: { color: '#746e89', marginTop: 3, fontSize: 12 },
+  recentSessionArrow: { fontSize: 26, color: '#9a93b0' },
   primaryButton: {
     marginTop: 8,
     width: '100%',
