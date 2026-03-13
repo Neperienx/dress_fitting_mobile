@@ -43,7 +43,7 @@ export default function StoreRecentSessionsScreen({ navigation, route }: Props) 
   }, [searchValue, sessions]);
 
   const openSession = (sessionId?: string) => {
-    navigation.getParent()?.getParent()?.navigate('Session', { open: 'recent', sessionId });
+    navigation.getParent()?.navigate('Session', { open: 'recent', sessionId });
   };
 
   return (
