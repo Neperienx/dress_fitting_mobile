@@ -122,6 +122,16 @@ function StoreHeaderTitle() {
   );
 }
 
+function AccountHeaderButton() {
+  const navigation = useNavigation<BottomTabNavigationProp<AppTabsParamList>>();
+
+  return (
+    <Pressable onPress={() => navigation.navigate('Home')} style={headerStyles.accountButton}>
+      <Text style={headerStyles.accountButtonIcon}>👤</Text>
+    </Pressable>
+  );
+}
+
 function StoresNavigator() {
   return (
     <StoresStack.Navigator>
@@ -154,14 +164,21 @@ function AppTabs() {
 
   const screenOptions = useMemo(
     () => ({
-      headerTitle: () => <StoreHeaderTitle />
+      headerTitle: () => <StoreHeaderTitle />,
+      headerRight: () => <AccountHeaderButton />
     }),
     []
   );
 
   return (
     <Tabs.Navigator screenOptions={screenOptions}>
-      <Tabs.Screen name="Home" component={HomeScreen} />
+      <Tabs.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          tabBarButton: () => null
+        }}
+      />
       <Tabs.Screen
         name="Session"
         component={SessionScreen}
@@ -247,6 +264,19 @@ const headerStyles = StyleSheet.create({
   triggerIcon: {
     fontSize: 14,
     color: '#6e6883'
+  },
+  accountButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: '#d8d3e7',
+    backgroundColor: '#fff'
+  },
+  accountButtonIcon: {
+    fontSize: 18
   },
   menuBackdrop: {
     flex: 1,
