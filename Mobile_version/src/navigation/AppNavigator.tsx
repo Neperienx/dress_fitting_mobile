@@ -187,11 +187,11 @@ function AppTabs() {
     <Tabs.Navigator
       screenOptions={({ route }) => ({
         ...screenOptions,
-        headerStyle: { backgroundColor: '#FFFFFF' },
+        headerStyle: { backgroundColor: '#FEFCFD' },
         headerShadowVisible: false,
-        tabBarStyle: { backgroundColor: '#FFFFFF', borderTopColor: '#E9E4E6' },
-        tabBarActiveTintColor: '#D8A7B1',
-        tabBarInactiveTintColor: '#6B6467',
+        tabBarStyle: { backgroundColor: '#FEFCFD', borderTopColor: '#EFE7EA' },
+        tabBarActiveTintColor: '#D59AA9',
+        tabBarInactiveTintColor: '#8A8084',
         tabBarIcon: () => <Text style={{ fontSize: 18 }}>{getTabIcon(route)}</Text>
       })}
     >
@@ -281,12 +281,12 @@ const headerStyles = StyleSheet.create({
   triggerText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2E2A2B',
+    color: '#443C40',
     maxWidth: 185
   },
   triggerIcon: {
     fontSize: 14,
-    color: '#6e6883'
+    color: '#908487'
   },
   accountButton: {
     width: 34,
@@ -295,8 +295,8 @@ const headerStyles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: '#E9E4E6',
-    backgroundColor: '#FFFFFF'
+    borderColor: '#EADFE3',
+    backgroundColor: '#FFF7FA'
   },
   accountButtonIcon: {
     fontSize: 18

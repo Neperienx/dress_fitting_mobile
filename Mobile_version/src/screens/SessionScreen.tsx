@@ -570,13 +570,13 @@ export default function SessionScreen() {
 
         <View style={styles.controlsRow}>
           <Pressable style={[styles.controlButton, styles.rejectButton]} onPress={() => animateSwipeOut('dislike')}>
-            <Text style={styles.controlText}>✕</Text>
+            <Text style={[styles.controlText, styles.rejectText]}>✕</Text>
           </Pressable>
           <Pressable style={[styles.controlButton, styles.superButton]} onPress={() => animateSwipeOut('superlike')}>
-            <Text style={styles.controlText}>★</Text>
+            <Text style={[styles.controlText, styles.superText]}>★</Text>
           </Pressable>
           <Pressable style={[styles.controlButton, styles.likeButton]} onPress={() => animateSwipeOut('like')}>
-            <Text style={styles.controlText}>♥</Text>
+            <Text style={[styles.controlText, styles.likeText]}>♥</Text>
           </Pressable>
         </View>
       </View>
@@ -709,7 +709,7 @@ export default function SessionScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8F5F7' },
+  screen: { flex: 1, backgroundColor: '#FEFAFC' },
   content: {
     flexGrow: 1,
     alignItems: 'center',
@@ -717,13 +717,13 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     gap: 14
   },
-  landingTabs: { flexDirection: 'row', backgroundColor: '#F1D9DF', borderRadius: 14, padding: 3, width: '100%' },
+  landingTabs: { flexDirection: 'row', backgroundColor: '#F3DCE3', borderRadius: 14, padding: 3, width: '100%' },
   landingTabButton: { flex: 1, borderRadius: 11, paddingVertical: 8, alignItems: 'center' },
   landingTabButtonActive: { backgroundColor: '#FFFFFF' },
-  landingTabText: { color: '#6B6467', fontWeight: '600' },
-  landingTabTextActive: { color: '#2E2A2B' },
-  title: { fontSize: 29, fontWeight: '700', color: '#2E2A2B' },
-  subtitle: { color: '#6d6880', fontSize: 15 },
+  landingTabText: { color: '#8B7E83', fontWeight: '600' },
+  landingTabTextActive: { color: '#433A3F' },
+  title: { fontSize: 29, fontWeight: '700', color: '#433A3F' },
+  subtitle: { color: '#94888F', fontSize: 15 },
   previewStackWrap: {
     width: 230,
     height: 280,
@@ -740,8 +740,8 @@ const styles = StyleSheet.create({
     height: 240,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#ded8ec',
-    backgroundColor: '#F1D9DF'
+    borderColor: '#EADDE2',
+    backgroundColor: '#F3DCE3'
   },
   placeholderCard: {
     alignItems: 'center',
@@ -750,19 +750,19 @@ const styles = StyleSheet.create({
     gap: 8
   },
   placeholderText: {
-    color: '#6B6467',
+    color: '#8B7E83',
     fontWeight: '600',
     textAlign: 'center'
   },
   placeholderHint: {
-    color: '#6B6467',
+    color: '#8B7E83',
     textAlign: 'center',
     fontSize: 12
   },
   recentListWrap: { width: '100%', gap: 10, marginTop: 4 },
   recentEmptyCard: {
     borderWidth: 1,
-    borderColor: '#ddd8ea',
+    borderColor: '#ECE2E6',
     borderRadius: 14,
     backgroundColor: '#FFFFFF',
     padding: 16,
@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
   },
   recentSessionRow: {
     borderWidth: 1,
-    borderColor: '#e0dbee',
+    borderColor: '#EDE4E8',
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
@@ -779,14 +779,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  recentSessionName: { color: '#2E2A2B', fontWeight: '700', fontSize: 16 },
-  recentSessionMeta: { color: '#6B6467', marginTop: 3, fontSize: 12 },
-  recentSessionArrow: { fontSize: 26, color: '#A8A1A4' },
+  recentSessionName: { color: '#433A3F', fontWeight: '700', fontSize: 16 },
+  recentSessionMeta: { color: '#8B7E83', marginTop: 3, fontSize: 12 },
+  recentSessionArrow: { fontSize: 26, color: '#B8ABAF' },
   primaryButton: {
     marginTop: 8,
     width: '100%',
     maxWidth: 260,
-    backgroundColor: '#D8A7B1',
+    backgroundColor: '#DEA9B6',
     borderRadius: 22,
     paddingVertical: 12,
     alignItems: 'center'
@@ -800,15 +800,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#E9E4E6',
+    borderColor: '#EFE5E9',
     borderRadius: 20,
     paddingVertical: 11,
     alignItems: 'center'
   },
-  secondaryButtonText: { color: '#6B6467', fontWeight: '700' },
+  secondaryButtonText: { color: '#8B7E83', fontWeight: '700' },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(22, 17, 38, 0.4)',
+    backgroundColor: 'rgba(33, 22, 29, 0.24)',
     justifyContent: 'flex-end'
   },
   dismissArea: { flex: 1 },
@@ -821,20 +821,20 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 10
   },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#2E2A2B' },
-  modalSubtitle: { color: '#6B6467', marginBottom: 6 },
-  fieldLabel: { color: '#6B6467', fontWeight: '600' },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#433A3F' },
+  modalSubtitle: { color: '#8B7E83', marginBottom: 6 },
+  fieldLabel: { color: '#8B7E83', fontWeight: '600' },
   input: {
     borderWidth: 1,
-    borderColor: '#E9E4E6',
+    borderColor: '#EFE5E9',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#2E2A2B'
+    color: '#433A3F'
   },
   swipeStage: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 24 },
-  sessionName: { textAlign: 'center', fontSize: 24, fontWeight: '700', color: '#2E2A2B' },
-  sessionCounter: { textAlign: 'center', color: '#7a728f', marginTop: 4 },
+  sessionName: { textAlign: 'center', fontSize: 24, fontWeight: '700', color: '#433A3F' },
+  sessionCounter: { textAlign: 'center', color: '#9B8E94', marginTop: 4 },
   deckArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   swipeCard: {
     width: '100%',
@@ -842,12 +842,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E9E4E6',
+    borderColor: '#EFE5E9',
     overflow: 'hidden'
   },
-  swipeImage: { width: '100%', aspectRatio: 0.72, backgroundColor: '#F2E6D8' },
+  swipeImage: { width: '100%', aspectRatio: 0.72, backgroundColor: '#F7EBDD' },
   cardBody: { padding: 14, gap: 6 },
-  cardName: { fontSize: 18, fontWeight: '700', color: '#2E2A2B' },
+  cardName: { fontSize: 18, fontWeight: '700', color: '#433A3F' },
   controlsRow: { flexDirection: 'row', justifyContent: 'center', gap: 20 },
   controlButton: {
     width: 58,
@@ -856,42 +856,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  rejectButton: { backgroundColor: '#F1D9DF' },
-  superButton: { backgroundColor: '#F2E6D8' },
-  likeButton: { backgroundColor: '#F2E6D8' },
-  controlText: { fontSize: 26, color: '#4a415f', fontWeight: '700' },
+  rejectButton: { backgroundColor: '#EADDE8' },
+  superButton: { backgroundColor: '#F7EBDD' },
+  likeButton: { backgroundColor: '#F5D8DF' },
+  controlText: { fontSize: 26, color: '#6A5C63', fontWeight: '700' },
+  rejectText: { color: '#6A5C73' },
+  superText: { color: '#C39A60' },
+  likeText: { color: '#D67582' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#2E2A2B' },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#433A3F' },
   resultsStage: { flex: 1 },
-  tabsRow: { flexDirection: 'row', marginHorizontal: 20, marginTop: 16, backgroundColor: '#F1D9DF', borderRadius: 14, padding: 3 },
+  tabsRow: { flexDirection: 'row', marginHorizontal: 20, marginTop: 16, backgroundColor: '#F3DCE3', borderRadius: 14, padding: 3 },
   tabButton: { flex: 1, borderRadius: 11, paddingVertical: 8, alignItems: 'center' },
   tabButtonActive: { backgroundColor: '#FFFFFF' },
-  tabText: { color: '#6B6467', fontWeight: '600' },
-  tabTextActive: { color: '#2E2A2B' },
+  tabText: { color: '#8B7E83', fontWeight: '600' },
+  tabTextActive: { color: '#433A3F' },
   resultsContent: { paddingHorizontal: 20, paddingVertical: 14, gap: 12, paddingBottom: 30 },
-  resultsTitle: { fontSize: 21, fontWeight: '700', color: '#2E2A2B' },
-  resultsSubtitle: { color: '#6B6467' },
+  resultsTitle: { fontSize: 21, fontWeight: '700', color: '#433A3F' },
+  resultsSubtitle: { color: '#8B7E83' },
   analyticsCategorySection: { gap: 8 },
-  analyticsCategoryTitle: { color: '#3d3652', fontWeight: '700' },
+  analyticsCategoryTitle: { color: '#5A4E53', fontWeight: '700' },
   analyticsRow: { gap: 6 },
   analyticsHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  analyticsTag: { color: '#443d5c', fontWeight: '600' },
-  analyticsScore: { color: '#6B6467', fontWeight: '600' },
-  analyticsBarTrack: { flexDirection: 'row', height: 10, width: '100%', borderRadius: 5, overflow: 'hidden', backgroundColor: '#F1D9DF' },
-  analyticsBarLike: { backgroundColor: '#D8A7B1', height: '100%' },
-  analyticsBarDislike: { backgroundColor: '#D4AF7F', height: '100%' },
+  analyticsTag: { color: '#65585E', fontWeight: '600' },
+  analyticsScore: { color: '#8B7E83', fontWeight: '600' },
+  analyticsBarTrack: { flexDirection: 'row', height: 10, width: '100%', borderRadius: 5, overflow: 'hidden', backgroundColor: '#F3DCE3' },
+  analyticsBarLike: { backgroundColor: '#DEA9B6', height: '100%' },
+  analyticsBarDislike: { backgroundColor: '#E8CFA8', height: '100%' },
   rankingCard: {
     flexDirection: 'row',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#e0daee',
+    borderColor: '#ECE2E7',
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
     padding: 10
   },
-  rankingImage: { width: 72, height: 96, borderRadius: 8, backgroundColor: '#e5e1f1' },
+  rankingImage: { width: 72, height: 96, borderRadius: 8, backgroundColor: '#F1E8EB' },
   rankingBody: { flex: 1, gap: 4 },
-  rankingName: { color: '#322b46', fontWeight: '700' },
-  rankingScore: { color: '#554d6a', fontWeight: '600' },
-  decisionPill: { color: '#4c4463', fontSize: 12, fontWeight: '600' }
+  rankingName: { color: '#54484E', fontWeight: '700' },
+  rankingScore: { color: '#807278', fontWeight: '600' },
+  decisionPill: { color: '#766971', fontSize: 12, fontWeight: '600' }
 });
