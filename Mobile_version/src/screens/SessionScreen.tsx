@@ -55,8 +55,12 @@ function getTagStorageKey(dressId: string) {
   return `dress-tags:${dressId}`;
 }
 
+function getDressImages(dress: SessionPreviewDress | SessionDress) {
+  return [...(dress.dress_images ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+}
+
 function getPreviewImage(dress: SessionPreviewDress | SessionDress) {
-  return [...(dress.dress_images ?? [])].sort((a, b) => a.sort_order - b.sort_order)[0]?.image_url ?? null;
+  return getDressImages(dress)[0]?.image_url ?? null;
 }
 
 function chooseDressesByTagCoverage(dresses: SessionDress[], count: number) {
@@ -133,6 +137,10 @@ export default function SessionScreen() {
   const [recentSessions, setRecentSessions] = useState<SavedSession[]>([]);
   const [selectedHistorySession, setSelectedHistorySession] = useState<SavedSession | null>(null);
   const [sessionSaved, setSessionSaved] = useState(false);
+  const [activeDressPhotoIndices, setActiveDressPhotoIndices] = useState<Record<string, number>>({});
+  const [selectedResultDressId, setSelectedResultDressId] = useState<string | null>(null);
+  const [shortlistDressIds, setShortlistDressIds] = useState<string[]>([]);
+  const [showShortlistOnly, setShowShortlistOnly] = useState(false);
 
   const swipePosition = useRef(new Animated.ValueXY()).current;
 
@@ -230,6 +238,8 @@ export default function SessionScreen() {
       const hit = recentSessions.find((entry) => entry.id === params.sessionId);
       if (hit) {
         setSelectedHistorySession(hit);
+        setShortlistDressIds(hit.shortlistDressIds ?? []);
+        setShowShortlistOnly(false);
         setSessionStage('results');
         setActiveTab('analytics');
       }
@@ -360,6 +370,10 @@ export default function SessionScreen() {
     setDressDecisions({});
     setSelectedHistorySession(null);
     setSessionSaved(false);
+    setActiveDressPhotoIndices({});
+    setSelectedResultDressId(null);
+    setShortlistDressIds([]);
+    setShowShortlistOnly(false);
     setLandingTab('start');
     setActiveTab('analytics');
     setShowSessionForm(false);
@@ -379,7 +393,8 @@ export default function SessionScreen() {
       sessionQueue,
       allStoreDresses,
       tagScores,
-      dressDecisions
+      dressDecisions,
+      shortlistDressIds
     };
 
     void (async () => {
@@ -397,6 +412,7 @@ export default function SessionScreen() {
     sessionQueue,
     sessionSaved,
     sessionStage,
+    shortlistDressIds,
     tagScores
   ]);
 
@@ -406,14 +422,16 @@ export default function SessionScreen() {
         sessionQueue: selectedHistorySession.sessionQueue,
         allStoreDresses: selectedHistorySession.allStoreDresses,
         tagScores: selectedHistorySession.tagScores,
-        dressDecisions: selectedHistorySession.dressDecisions
+        dressDecisions: selectedHistorySession.dressDecisions,
+        shortlistDressIds
       }
     : {
         brideName,
         sessionQueue,
         allStoreDresses,
         tagScores,
-        dressDecisions
+        dressDecisions,
+        shortlistDressIds
       };
 
   const rankedDresses = useMemo(() => {
@@ -432,6 +450,46 @@ export default function SessionScreen() {
         .map(([tag, stats]) => ({ tag, ...stats })),
     [activeSessionData.tagScores]
   );
+
+  const resultDressById = useMemo(() => {
+    return new Map(activeSessionData.allStoreDresses.map((dress) => [dress.id, dress]));
+  }, [activeSessionData.allStoreDresses]);
+
+  const selectedResultDress = selectedResultDressId ? resultDressById.get(selectedResultDressId) ?? null : null;
+
+  const setDressPhotoIndex = useCallback((dressId: string, index: number) => {
+    setActiveDressPhotoIndices((previous) => ({ ...previous, [dressId]: index }));
+  }, []);
+
+  const changeDressPhoto = useCallback(
+    (dressId: string, direction: 1 | -1, dressList?: SessionDress[]) => {
+      const sourceList = dressList ?? activeSessionData.allStoreDresses;
+      const dress = sourceList.find((entry) => entry.id === dressId);
+      if (!dress) {
+        return;
+      }
+
+      const images = getDressImages(dress);
+      if (images.length <= 1) {
+        return;
+      }
+
+      const currentIndex = activeDressPhotoIndices[dressId] ?? 0;
+      const nextIndex = currentIndex + direction;
+      if (nextIndex < 0 || nextIndex >= images.length) {
+        return;
+      }
+
+      setDressPhotoIndex(dressId, nextIndex);
+    },
+    [activeSessionData.allStoreDresses, activeDressPhotoIndices, setDressPhotoIndex]
+  );
+
+  const toggleShortlist = useCallback((dressId: string) => {
+    setShortlistDressIds((previous) =>
+      previous.includes(dressId) ? previous.filter((id) => id !== dressId) : [...previous, dressId]
+    );
+  }, []);
 
   const tagsByCategory = useMemo(() => {
     const categoryByTag = new Map<string, string>();
@@ -518,6 +576,8 @@ export default function SessionScreen() {
                 style={styles.recentSessionRow}
                 onPress={() => {
                   setSelectedHistorySession(entry);
+                  setShortlistDressIds(entry.shortlistDressIds ?? []);
+                  setShowShortlistOnly(false);
                   setActiveTab('analytics');
                   setSessionStage('results');
                 }}
@@ -544,7 +604,10 @@ export default function SessionScreen() {
       );
     }
 
-    const image = getPreviewImage(currentDress);
+    const dressImages = getDressImages(currentDress);
+    const imageCount = dressImages.length;
+    const currentIndex = activeDressPhotoIndices[currentDress.id] ?? 0;
+    const image = dressImages[currentIndex]?.image_url ?? null;
 
     return (
       <View style={styles.swipeStage}>
@@ -562,6 +625,22 @@ export default function SessionScreen() {
                 <Text style={styles.placeholderText}>No photo</Text>
               </View>
             )}
+            {imageCount > 0 ? (
+              <View pointerEvents="none" style={styles.photoIndicatorRow}>
+                {dressImages.map((_, index) => (
+                  <View
+                    key={`${currentDress.id}-dot-${index}`}
+                    style={[styles.photoIndicatorDot, index === currentIndex && styles.photoIndicatorDotActive]}
+                  />
+                ))}
+              </View>
+            ) : null}
+            {imageCount > 1 ? (
+              <View style={styles.photoNavOverlay}>
+                <Pressable style={styles.photoNavZone} onPress={() => changeDressPhoto(currentDress.id, -1, sessionQueue)} />
+                <Pressable style={styles.photoNavZone} onPress={() => changeDressPhoto(currentDress.id, 1, sessionQueue)} />
+              </View>
+            ) : null}
             <View style={styles.cardBody}>
               <Text style={styles.cardName}>{currentDress.name || 'Untitled dress'}</Text>
             </View>
@@ -620,28 +699,54 @@ export default function SessionScreen() {
     </ScrollView>
   );
 
-  const renderRankingTab = () => (
-    <ScrollView contentContainerStyle={styles.resultsContent}>
-      <Text style={styles.resultsTitle}>Store ranking</Text>
-      {rankedDresses.map((entry, index) => {
-        const image = getPreviewImage(entry.dress);
-        const decision = activeSessionData.dressDecisions[entry.dress.id];
+  const renderRankingTab = () => {
+    const dressesToShow = showShortlistOnly
+      ? rankedDresses.filter((entry) => activeSessionData.shortlistDressIds.includes(entry.dress.id))
+      : rankedDresses;
 
-        return (
-          <View key={entry.dress.id} style={styles.rankingCard}>
-            {image ? <Image source={{ uri: image }} style={styles.rankingImage} /> : <View style={styles.rankingImage} />}
-            <View style={styles.rankingBody}>
-              <Text style={styles.rankingName}>
-                #{index + 1} {entry.dress.name || 'Untitled dress'}
-              </Text>
-              <Text style={styles.rankingScore}>Score: {entry.score}</Text>
-              {decision ? <Text style={styles.decisionPill}>Session action: {decision}</Text> : null}
-            </View>
-          </View>
-        );
-      })}
-    </ScrollView>
-  );
+    return (
+      <ScrollView contentContainerStyle={styles.resultsContent}>
+        <Text style={styles.resultsTitle}>{showShortlistOnly ? 'Shortlisted dresses' : 'Store ranking'}</Text>
+        {dressesToShow.length === 0 ? (
+          <Text style={styles.placeholderHint}>No dresses yet. Tap ☆ on a dress to build a shortlist.</Text>
+        ) : (
+          dressesToShow.map((entry, index) => {
+            const dressImages = getDressImages(entry.dress);
+            const imageIndex = activeDressPhotoIndices[entry.dress.id] ?? 0;
+            const image = dressImages[imageIndex]?.image_url ?? null;
+            const decision = activeSessionData.dressDecisions[entry.dress.id];
+            const isShortlisted = activeSessionData.shortlistDressIds.includes(entry.dress.id);
+
+            return (
+              <Pressable key={entry.dress.id} style={styles.rankingCard} onPress={() => setSelectedResultDressId(entry.dress.id)}>
+                {image ? <Image source={{ uri: image }} style={styles.rankingImage} /> : <View style={styles.rankingImage} />}
+                <View style={styles.rankingBody}>
+                  <View style={styles.rankingHeader}>
+                    <Text style={styles.rankingName}>
+                      #{index + 1} {entry.dress.name || 'Untitled dress'}
+                    </Text>
+                    <Pressable
+                      hitSlop={10}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        toggleShortlist(entry.dress.id);
+                      }}
+                    >
+                      <Text style={[styles.shortlistStar, isShortlisted && styles.shortlistStarActive]}>★</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.rankingScore}>Score: {entry.score}</Text>
+                  <Text style={styles.rankingHint}>Tap card to view and browse photos</Text>
+                  {decision ? <Text style={styles.decisionPill}>Session action: {decision}</Text> : null}
+                </View>
+              </Pressable>
+            );
+          })
+        )}
+      </ScrollView>
+    );
+  };
+
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -661,17 +766,89 @@ export default function SessionScreen() {
           <Pressable
             style={styles.secondaryButton}
             onPress={() => {
+              if (activeTab === 'ranking') {
+                setShowShortlistOnly((previous) => !previous);
+                return;
+              }
+
               setSessionStage('landing');
               setSwipeIndex(0);
               setSessionQueue([]);
               setSelectedHistorySession(null);
+              setSelectedResultDressId(null);
+              setShowShortlistOnly(false);
               setLandingTab('recent');
             }}
           >
-            <Text style={styles.secondaryButtonText}>{selectedHistorySession ? 'Back to Recent Sessions' : 'Start New Session'}</Text>
+            <Text style={styles.secondaryButtonText}>
+              {activeTab === 'ranking'
+                ? showShortlistOnly
+                  ? 'Show all dresses'
+                  : 'Go to shortlist'
+                : selectedHistorySession
+                  ? 'Back to Recent Sessions'
+                  : 'Start New Session'}
+            </Text>
           </Pressable>
         </View>
       )}
+
+      <Modal
+        transparent
+        visible={Boolean(selectedResultDress)}
+        animationType="fade"
+        onRequestClose={() => setSelectedResultDressId(null)}
+      >
+        <View style={styles.profileModalBackdrop}>
+          <Pressable style={styles.dismissArea} onPress={() => setSelectedResultDressId(null)} />
+          {selectedResultDress ? (
+            <View style={styles.profileModalCard}>
+              {(() => {
+                const dressImages = getDressImages(selectedResultDress);
+                const currentIndex = activeDressPhotoIndices[selectedResultDress.id] ?? 0;
+                const image = dressImages[currentIndex]?.image_url ?? null;
+                const isShortlisted = activeSessionData.shortlistDressIds.includes(selectedResultDress.id);
+                return (
+                  <>
+                    <View style={styles.profileModalImageWrap}>
+                      {image ? (
+                        <Image source={{ uri: image }} style={styles.profileModalImage} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.profileModalImage, styles.placeholderCard]}>
+                          <Text style={styles.placeholderText}>No photo</Text>
+                        </View>
+                      )}
+                      {dressImages.length > 0 ? (
+                        <View pointerEvents="none" style={styles.photoIndicatorRow}>
+                          {dressImages.map((_, index) => (
+                            <View
+                              key={`${selectedResultDress.id}-profile-dot-${index}`}
+                              style={[styles.photoIndicatorDot, index === currentIndex && styles.photoIndicatorDotActive]}
+                            />
+                          ))}
+                        </View>
+                      ) : null}
+                      {dressImages.length > 1 ? (
+                        <View style={styles.photoNavOverlay}>
+                          <Pressable style={styles.photoNavZone} onPress={() => changeDressPhoto(selectedResultDress.id, -1)} />
+                          <Pressable style={styles.photoNavZone} onPress={() => changeDressPhoto(selectedResultDress.id, 1)} />
+                        </View>
+                      ) : null}
+                    </View>
+                    <View style={styles.profileModalBody}>
+                      <View style={styles.rankingHeader}>
+                        <Text style={styles.resultsTitle}>{selectedResultDress.name || 'Untitled dress'}</Text>
+                        <Pressable onPress={() => toggleShortlist(selectedResultDress.id)}><Text style={[styles.shortlistStar, isShortlisted && styles.shortlistStarActive]}>★</Text></Pressable>
+                      </View>
+                      <Text style={styles.rankingHint}>Tap left/right side of image to navigate photos.</Text>
+                    </View>
+                  </>
+                );
+              })()}
+            </View>
+          ) : null}
+        </View>
+      </Modal>
 
       <Modal transparent visible={showSessionForm} animationType="slide" onRequestClose={() => setShowSessionForm(false)}>
         <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', default: undefined })} style={styles.modalBackdrop}>
@@ -846,6 +1023,26 @@ const styles = StyleSheet.create({
     overflow: 'hidden'
   },
   swipeImage: { width: '100%', aspectRatio: 0.72, backgroundColor: '#F7EBDD' },
+  photoIndicatorRow: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    flexDirection: 'row',
+    gap: 4
+  },
+  photoIndicatorDot: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.45)'
+  },
+  photoIndicatorDotActive: { backgroundColor: '#FFFFFF' },
+  photoNavOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row'
+  },
+  photoNavZone: { flex: 1 },
   cardBody: { padding: 14, gap: 6 },
   cardName: { fontSize: 18, fontWeight: '700', color: '#433A3F' },
   controlsRow: { flexDirection: 'row', justifyContent: 'center', gap: 20 },
@@ -894,7 +1091,25 @@ const styles = StyleSheet.create({
   },
   rankingImage: { width: 72, height: 96, borderRadius: 8, backgroundColor: '#F1E8EB' },
   rankingBody: { flex: 1, gap: 4 },
+  rankingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
   rankingName: { color: '#54484E', fontWeight: '700' },
   rankingScore: { color: '#807278', fontWeight: '600' },
-  decisionPill: { color: '#766971', fontSize: 12, fontWeight: '600' }
+  rankingHint: { color: '#9C8F95', fontSize: 12 },
+  shortlistStar: { color: '#CBBFC4', fontSize: 24, lineHeight: 24 },
+  shortlistStarActive: { color: '#E6B94A' },
+  decisionPill: { color: '#766971', fontSize: 12, fontWeight: '600' },
+  profileModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(20, 12, 16, 0.52)',
+    justifyContent: 'flex-end'
+  },
+  profileModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden'
+  },
+  profileModalImageWrap: { width: '100%', aspectRatio: 0.72, backgroundColor: '#F1E8EB' },
+  profileModalImage: { width: '100%', height: '100%' },
+  profileModalBody: { padding: 16, gap: 6 }
 });
