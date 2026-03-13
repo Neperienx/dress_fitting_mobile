@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import { NavigationContainer, NavigatorScreenParams, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -22,16 +22,6 @@ type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
   ForgotPassword: undefined;
-};
-
-type AppTabsParamList = {
-  Home: undefined;
-  Session: {
-    open?: 'recent';
-    sessionId?: string;
-  } | undefined;
-  Stores: undefined;
-  Alerts: undefined;
 };
 
 export type StoresStackParamList = {
@@ -64,6 +54,19 @@ export type StoresStackParamList = {
       }[];
     };
   };
+};
+
+type AppTabsParamList = {
+  Home: undefined;
+  Session:
+    | {
+        open?: 'recent';
+        sessionId?: string;
+        resetToStart?: boolean;
+      }
+    | undefined;
+  Stores: NavigatorScreenParams<StoresStackParamList> | undefined;
+  Alerts: undefined;
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -147,6 +150,8 @@ function StoresNavigator() {
 }
 
 function AppTabs() {
+  const { selectedStore } = useStore();
+
   const screenOptions = useMemo(
     () => ({
       headerTitle: () => <StoreHeaderTitle />
@@ -157,8 +162,40 @@ function AppTabs() {
   return (
     <Tabs.Navigator screenOptions={screenOptions}>
       <Tabs.Screen name="Home" component={HomeScreen} />
-      <Tabs.Screen name="Session" component={SessionScreen} />
-      <Tabs.Screen name="Stores" component={StoresNavigator} options={{ headerShown: false }} />
+      <Tabs.Screen
+        name="Session"
+        component={SessionScreen}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => {
+            event.preventDefault();
+            navigation.navigate('Session', { resetToStart: true });
+          }
+        })}
+      />
+      <Tabs.Screen
+        name="Stores"
+        component={StoresNavigator}
+        options={{ headerShown: false }}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => {
+            event.preventDefault();
+
+            if (!selectedStore) {
+              navigation.navigate('Stores', { screen: 'StoresList' });
+              return;
+            }
+
+            navigation.navigate('Stores', {
+              screen: 'StoreDetail',
+              params: {
+                storeId: selectedStore.id,
+                storeName: selectedStore.name,
+                storeCity: selectedStore.city
+              }
+            });
+          }
+        })}
+      />
       <Tabs.Screen name="Alerts" component={AlertsScreen} />
     </Tabs.Navigator>
   );
