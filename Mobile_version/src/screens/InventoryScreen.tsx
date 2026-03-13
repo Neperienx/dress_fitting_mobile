@@ -59,6 +59,25 @@ function isSupportedImageUri(value: string) {
   return allowedImageUriSchemes.some((scheme) => normalized.startsWith(scheme));
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    const details = 'details' in error && typeof error.details === 'string' ? error.details : null;
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : null;
+
+    return [error.message, details, code ? `code: ${code}` : null].filter(Boolean).join(' · ');
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return 'Unknown error';
+}
+
 function loadImagePickerModule(): MaybeImagePickerModule | null {
   try {
     return require('expo-image-picker') as MaybeImagePickerModule;
@@ -107,7 +126,7 @@ export default function InventoryScreen({ route }: Props) {
       }));
       setDresses(formatted as Dress[]);
     } catch (error) {
-      Alert.alert('Could not load inventory', error instanceof Error ? error.message : 'Unknown error');
+      Alert.alert('Could not load inventory', getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -259,7 +278,14 @@ export default function InventoryScreen({ route }: Props) {
       resetForm();
       await loadDresses();
     } catch (error) {
-      Alert.alert('Could not save dress', error instanceof Error ? error.message : 'Unknown error');
+      const debugMessage = getErrorMessage(error);
+      console.error('[InventoryScreen] Failed to save dress', {
+        storeId,
+        userId: session?.user.id,
+        photoCount: sanitizedPhotoUrls.length,
+        error
+      });
+      Alert.alert('Could not save dress', `Unable to save this dress right now. ${debugMessage}`);
     } finally {
       setSavingDress(false);
     }
