@@ -8,6 +8,11 @@ npm install
 npm run start
 ```
 
+or 
+open docker
+npx supabase start
+npx expo start -c
+
 ## 2) Start Supabase locally
 
 From `Mobile_version/`:
