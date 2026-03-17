@@ -66,10 +66,21 @@ Use the Supabase URL that your app runtime can reach:
 - Dress catalog + tag filters
 - Studio/store CRUD and team roles
 
+
+## Inventory offline behavior
+
+- Inventory metadata (dresses + image URLs) is cached per store in `AsyncStorage`.
+- On each load, the app uses the local cache first and only checks Supabase for changes when the cache is older than ~30 minutes.
+- When stale, it fetches only an index (`id + updated_at`) and then downloads only changed/new rows; unchanged rows are reused from local cache.
+- Deletions are reconciled by comparing local IDs with remote IDs.
+- If a new phone signs in, it will download inventory once and then reuse its local cache.
+- Image URLs are prefetched for faster reuse, but canonical storage remains in Supabase + remote image host.
+
 ## Troubleshooting
 
 - If you see `Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY`, your `.env` was not loaded.
 - If you see `Network request failed`, the host in `EXPO_PUBLIC_SUPABASE_URL` is not reachable from your runtime.
 - After editing `.env`, fully restart Expo (`npm run start` again).
 - If inventory fails with `Could not find the table 'public.dresses' in the schema cache · code: PGRST205`, your DB is missing the inventory migration. From `Mobile_version/` run `npx supabase db push` (or `npx supabase db reset` for local), then reload the app.
+- If you see errors about `updated_at` missing, run `npx supabase db push` to apply migration `004_inventory_updated_at.sql`.
 - For physical devices, ensure phone and computer are on the same network and port `54321` is reachable.
