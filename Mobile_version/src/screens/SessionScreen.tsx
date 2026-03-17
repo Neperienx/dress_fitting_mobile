@@ -22,7 +22,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { assertSupabaseConfigured, supabase } from '../lib/supabase';
 import { 
   SavedSession,
   SessionDress,
@@ -32,6 +31,7 @@ import {
   loadSessionHistory,
   prependSessionHistory
 } from '../utils/sessionHistory';
+import { syncInventoryForStore } from '../utils/inventoryCache';
 
 const englishTagCatalog = require('../data/dress-tags.en.json') as {
   categories?: Array<{ name: string; tags: string[] }>;
@@ -153,18 +153,7 @@ export default function SessionScreen() {
 
     setLoadingPreview(true);
     try {
-      assertSupabaseConfigured();
-      const { data, error } = await supabase
-        .from('dresses')
-        .select('id, name, price, created_at, dress_images(id, image_url, sort_order)')
-        .eq('studio_id', selectedStore.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      const dresses = (data ?? []) as SessionPreviewDress[];
+      const dresses = (await syncInventoryForStore({ storeId: selectedStore.id })) as SessionPreviewDress[];
       const keys = dresses.map((dress) => getTagStorageKey(dress.id));
       const storedTags = keys.length > 0 ? await AsyncStorage.multiGet(keys) : [];
       const tagsByKey = new Map(storedTags);

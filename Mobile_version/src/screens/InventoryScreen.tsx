@@ -16,12 +16,14 @@ import {
 
 import { useAuth } from '../context/AuthContext';
 import { assertSupabaseConfigured, supabase } from '../lib/supabase';
+import { syncInventoryForStore } from '../utils/inventoryCache';
 import { StoresStackParamList } from '../navigation/AppNavigator';
 
 type DressImage = {
   id: string;
   image_url: string;
   sort_order: number;
+  created_at?: string;
 };
 
 type Dress = {
@@ -134,23 +136,9 @@ export default function InventoryScreen({ route, navigation }: Props) {
 
   const loadDresses = useCallback(async () => {
     try {
-      assertSupabaseConfigured();
       setLoading(true);
-      const { data, error } = await supabase
-        .from('dresses')
-        .select('id, name, price, created_at, dress_images(id, image_url, sort_order)')
-        .eq('studio_id', storeId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      const formatted = (data ?? []).map((dress) => ({
-        ...dress,
-        dress_images: [...(dress.dress_images ?? [])].sort((a, b) => a.sort_order - b.sort_order)
-      }));
-      setDresses(formatted as Dress[]);
+      const data = await syncInventoryForStore({ storeId });
+      setDresses(data as Dress[]);
     } catch (error) {
       if (isMissingInventorySchemaError(error)) {
         Alert.alert('Could not load inventory', getInventorySchemaMissingMessage());
