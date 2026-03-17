@@ -66,6 +66,15 @@ Use the Supabase URL that your app runtime can reach:
 - Dress catalog + tag filters
 - Studio/store CRUD and team roles
 
+
+## Inventory offline behavior
+
+- Inventory metadata (dresses + image URLs) is cached per store in `AsyncStorage`.
+- On each load, the app uses the local cache first and only checks Supabase for changes when the cache is older than ~30 minutes.
+- If the revision in Supabase matches the local revision, no full inventory download is done.
+- If a new phone signs in, it will download inventory once and then reuse its local cache.
+- Image URLs are prefetched for faster reuse, but canonical storage remains in Supabase + remote image host.
+
 ## Troubleshooting
 
 - If you see `Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY`, your `.env` was not loaded.
