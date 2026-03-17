@@ -73,6 +73,7 @@ Use the Supabase URL that your app runtime can reach:
 - On each load, the app uses the local cache first and only checks Supabase for changes when the cache is older than ~30 minutes.
 - When stale, it fetches only an index (`id + updated_at`) and then downloads only changed/new rows; unchanged rows are reused from local cache.
 - Deletions are reconciled by comparing local IDs with remote IDs.
+- If the revision in Supabase matches the local revision, no full inventory download is done.
 - If a new phone signs in, it will download inventory once and then reuse its local cache.
 - Image URLs are prefetched for faster reuse, but canonical storage remains in Supabase + remote image host.
 

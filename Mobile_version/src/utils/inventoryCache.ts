@@ -8,7 +8,6 @@ export type InventoryDressImage = {
   image_url: string;
   sort_order: number;
   created_at?: string;
-  updated_at?: string;
 };
 
 export type InventoryDress = {
@@ -16,12 +15,12 @@ export type InventoryDress = {
   name: string | null;
   price: number | null;
   created_at: string;
-  updated_at?: string;
   dress_images: InventoryDressImage[];
 };
 
 type CachedInventorySnapshot = {
   dresses: InventoryDress[];
+  revision: string;
   lastSyncedAt: string;
 };
 
@@ -30,55 +29,29 @@ type SyncInventoryOptions = {
   maxCacheAgeMs?: number;
 };
 
-type RemoteDressRow = {
-  id: string;
-  name: string | null;
-  price: number | null;
-  created_at: string;
-  updated_at?: string;
-};
-
-type RemoteImageRow = {
-  id: string;
-  dress_id: string;
-  image_url: string;
-  sort_order: number;
-  created_at?: string;
-  updated_at?: string;
-};
-
-type DressIndexRow = {
-  id: string;
-  updated_at?: string;
-  created_at: string;
-};
-
-type ImageIndexRow = {
-  id: string;
-  dress_id: string;
-  updated_at?: string;
-  created_at?: string;
-};
-
 function getInventoryCacheKey(storeId: string) {
   return `inventory-cache:${storeId}`;
 }
 
 function normalizeDresses(dresses: InventoryDress[]) {
-  return dresses
-    .map((dress) => ({
-      ...dress,
-      dress_images: [...(dress.dress_images ?? [])].sort((a, b) => a.sort_order - b.sort_order)
-    }))
-    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  return dresses.map((dress) => ({
+    ...dress,
+    dress_images: [...(dress.dress_images ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+  }));
 }
 
-function getDressVersionToken(dress: { updated_at?: string; created_at: string }) {
-  return dress.updated_at ?? dress.created_at;
-}
+function buildRevisionToken(dresses: InventoryDress[]) {
+  const dressToken = dresses
+    .map((dress) => `${dress.id}:${dress.created_at}`)
+    .sort()
+    .join('|');
 
-function getImageVersionToken(image: { updated_at?: string; created_at?: string }) {
-  return image.updated_at ?? image.created_at ?? '';
+  const imageToken = dresses
+    .flatMap((dress) => (dress.dress_images ?? []).map((image) => `${dress.id}:${image.id}:${image.created_at ?? ''}:${image.sort_order}`))
+    .sort()
+    .join('|');
+
+  return `${dressToken}::${imageToken}`;
 }
 
 async function readCachedInventory(storeId: string) {
@@ -89,7 +62,7 @@ async function readCachedInventory(storeId: string) {
 
   try {
     const parsed = JSON.parse(raw) as CachedInventorySnapshot;
-    if (!Array.isArray(parsed?.dresses) || typeof parsed?.lastSyncedAt !== 'string') {
+    if (!Array.isArray(parsed?.dresses) || typeof parsed?.revision !== 'string' || typeof parsed?.lastSyncedAt !== 'string') {
       return null;
     }
 
@@ -103,8 +76,10 @@ async function readCachedInventory(storeId: string) {
 }
 
 async function writeCachedInventory(storeId: string, dresses: InventoryDress[]) {
+  const normalized = normalizeDresses(dresses);
   const payload: CachedInventorySnapshot = {
-    dresses: normalizeDresses(dresses),
+    dresses: normalized,
+    revision: buildRevisionToken(normalized),
     lastSyncedAt: new Date().toISOString()
   };
 
@@ -115,7 +90,7 @@ async function fetchFullInventory(storeId: string) {
   assertSupabaseConfigured();
   const { data, error } = await supabase
     .from('dresses')
-    .select('id, name, price, created_at, updated_at, dress_images(id, image_url, sort_order, created_at, updated_at)')
+    .select('id, name, price, created_at, dress_images(id, image_url, sort_order, created_at)')
     .eq('studio_id', storeId)
     .order('created_at', { ascending: false });
 
@@ -126,12 +101,12 @@ async function fetchFullInventory(storeId: string) {
   return normalizeDresses((data ?? []) as InventoryDress[]);
 }
 
-async function fetchInventoryIndex(storeId: string) {
+async function fetchInventoryRevision(storeId: string) {
   assertSupabaseConfigured();
 
   const { data: dresses, error: dressesError } = await supabase
     .from('dresses')
-    .select('id, created_at, updated_at')
+    .select('id, created_at')
     .eq('studio_id', storeId)
     .order('created_at', { ascending: false });
 
@@ -139,53 +114,44 @@ async function fetchInventoryIndex(storeId: string) {
     throw dressesError;
   }
 
-  const { data: images, error: imagesError } = await supabase
+  const { data: dressImages, error: imagesError } = await supabase
     .from('dress_images')
-    .select('id, dress_id, created_at, updated_at, dresses!inner(studio_id)')
-    .eq('dresses.studio_id', storeId);
+    .select('id, sort_order, created_at, dress_id, dresses!inner(studio_id)')
+    .eq('dresses.studio_id', storeId)
+    .order('created_at', { ascending: false });
 
   if (imagesError) {
     throw imagesError;
   }
 
-  return {
-    dresses: (dresses ?? []) as DressIndexRow[],
-    images: (images ?? []) as ImageIndexRow[]
-  };
-}
+  const dressesById = new Map(
+    ((dresses ?? []) as { id: string; created_at: string }[]).map((dress) => [
+      dress.id,
+      {
+        id: dress.id,
+        name: null,
+        price: null,
+        created_at: dress.created_at,
+        dress_images: [] as InventoryDressImage[]
+      }
+    ])
+  );
 
-async function fetchDressesByIds(ids: string[]) {
-  if (ids.length === 0) {
-    return [];
-  }
+  ((dressImages ?? []) as { id: string; sort_order: number; created_at?: string; dress_id: string }[]).forEach((image) => {
+    const dress = dressesById.get(image.dress_id);
+    if (!dress) {
+      return;
+    }
 
-  const { data, error } = await supabase
-    .from('dresses')
-    .select('id, name, price, created_at, updated_at')
-    .in('id', ids);
+    dress.dress_images.push({
+      id: image.id,
+      image_url: '',
+      sort_order: image.sort_order,
+      created_at: image.created_at
+    });
+  });
 
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as RemoteDressRow[];
-}
-
-async function fetchImagesByIds(ids: string[]) {
-  if (ids.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await supabase
-    .from('dress_images')
-    .select('id, dress_id, image_url, sort_order, created_at, updated_at')
-    .in('id', ids);
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as RemoteImageRow[];
+  return buildRevisionToken(Array.from(dressesById.values()));
 }
 
 function prefetchInventoryImages(dresses: InventoryDress[]) {
@@ -198,17 +164,6 @@ function prefetchInventoryImages(dresses: InventoryDress[]) {
   });
 }
 
-function toDressMap(dresses: InventoryDress[]) {
-  const map = new Map<string, InventoryDress>();
-  dresses.forEach((dress) => {
-    map.set(dress.id, {
-      ...dress,
-      dress_images: [...dress.dress_images]
-    });
-  });
-  return map;
-}
-
 export async function syncInventoryForStore({ storeId, maxCacheAgeMs = 1000 * 60 * 30 }: SyncInventoryOptions) {
   const cached = await readCachedInventory(storeId);
 
@@ -217,6 +172,7 @@ export async function syncInventoryForStore({ storeId, maxCacheAgeMs = 1000 * 60
   }
 
   const cacheAgeMs = cached ? Date.now() - new Date(cached.lastSyncedAt).getTime() : Number.POSITIVE_INFINITY;
+
   if (cached && cacheAgeMs <= maxCacheAgeMs) {
     return cached.dresses;
   }
@@ -229,115 +185,15 @@ export async function syncInventoryForStore({ storeId, maxCacheAgeMs = 1000 * 60
       return dresses;
     }
 
-    const remoteIndex = await fetchInventoryIndex(storeId);
-
-    const cachedDressMap = toDressMap(cached.dresses);
-    const cachedDressIds = new Set(cached.dresses.map((dress) => dress.id));
-    const remoteDressIds = new Set(remoteIndex.dresses.map((dress) => dress.id));
-
-    const removedDressIds = [...cachedDressIds].filter((id) => !remoteDressIds.has(id));
-    const changedDressIds = remoteIndex.dresses
-      .filter((remoteDress) => {
-        const cachedDress = cachedDressMap.get(remoteDress.id);
-        if (!cachedDress) {
-          return true;
-        }
-
-        return getDressVersionToken(remoteDress) !== getDressVersionToken(cachedDress);
-      })
-      .map((dress) => dress.id);
-
-    const cachedImageRows = cached.dresses.flatMap((dress) =>
-      dress.dress_images.map((image) => ({
-        id: image.id,
-        dress_id: dress.id,
-        updated_at: image.updated_at,
-        created_at: image.created_at
-      }))
-    );
-
-    const cachedImageMap = new Map(cachedImageRows.map((image) => [image.id, image]));
-    const cachedImageIds = new Set(cachedImageRows.map((image) => image.id));
-    const remoteImageIds = new Set(remoteIndex.images.map((image) => image.id));
-
-    const removedImageIds = [...cachedImageIds].filter((id) => !remoteImageIds.has(id));
-    const changedImageIds = remoteIndex.images
-      .filter((remoteImage) => {
-        const cachedImage = cachedImageMap.get(remoteImage.id);
-        if (!cachedImage) {
-          return true;
-        }
-
-        return getImageVersionToken(remoteImage) !== getImageVersionToken(cachedImage);
-      })
-      .map((image) => image.id);
-
-    if (removedDressIds.length === 0 && changedDressIds.length === 0 && removedImageIds.length === 0 && changedImageIds.length === 0) {
-      await writeCachedInventory(storeId, cached.dresses);
+    const remoteRevision = await fetchInventoryRevision(storeId);
+    if (remoteRevision === cached.revision) {
       return cached.dresses;
     }
 
-    const [changedDresses, changedImages] = await Promise.all([
-      fetchDressesByIds(changedDressIds),
-      fetchImagesByIds(changedImageIds)
-    ]);
-
-    removedDressIds.forEach((dressId) => cachedDressMap.delete(dressId));
-
-    changedDresses.forEach((dressRow) => {
-      const existing = cachedDressMap.get(dressRow.id);
-      cachedDressMap.set(dressRow.id, {
-        id: dressRow.id,
-        name: dressRow.name,
-        price: dressRow.price,
-        created_at: dressRow.created_at,
-        updated_at: dressRow.updated_at,
-        dress_images: existing?.dress_images ?? []
-      });
-    });
-
-    if (removedImageIds.length > 0) {
-      cachedDressMap.forEach((dress) => {
-        dress.dress_images = dress.dress_images.filter((image) => !removedImageIds.includes(image.id));
-      });
-    }
-
-    if (changedImages.length > 0) {
-      const imagesByDress = new Map<string, InventoryDressImage[]>();
-      cachedDressMap.forEach((dress, dressId) => {
-        imagesByDress.set(dressId, [...dress.dress_images]);
-      });
-
-      changedImages.forEach((imageRow) => {
-        const hostDress = cachedDressMap.get(imageRow.dress_id);
-        if (!hostDress) {
-          return;
-        }
-
-        const current = imagesByDress.get(imageRow.dress_id) ?? [];
-        const filtered = current.filter((image) => image.id !== imageRow.id);
-        filtered.push({
-          id: imageRow.id,
-          image_url: imageRow.image_url,
-          sort_order: imageRow.sort_order,
-          created_at: imageRow.created_at,
-          updated_at: imageRow.updated_at
-        });
-        imagesByDress.set(imageRow.dress_id, filtered);
-      });
-
-      imagesByDress.forEach((images, dressId) => {
-        const dress = cachedDressMap.get(dressId);
-        if (dress) {
-          dress.dress_images = images;
-        }
-      });
-    }
-
-    const nextDresses = normalizeDresses(Array.from(cachedDressMap.values()));
-    await writeCachedInventory(storeId, nextDresses);
-    prefetchInventoryImages(nextDresses);
-    return nextDresses;
+    const freshDresses = await fetchFullInventory(storeId);
+    await writeCachedInventory(storeId, freshDresses);
+    prefetchInventoryImages(freshDresses);
+    return freshDresses;
   } catch (error) {
     if (cached) {
       return cached.dresses;
