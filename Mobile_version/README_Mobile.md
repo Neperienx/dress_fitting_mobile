@@ -85,3 +85,15 @@ Use the Supabase URL that your app runtime can reach:
 - If inventory fails with `Could not find the table 'public.dresses' in the schema cache · code: PGRST205`, your DB is missing the inventory migration. From `Mobile_version/` run `npx supabase db push` (or `npx supabase db reset` for local), then reload the app.
 - If you see errors about `updated_at` missing, run `npx supabase db push` to apply migration `004_inventory_updated_at.sql`.
 - For physical devices, ensure phone and computer are on the same network and port `54321` is reachable.
+
+## Session shortlist recap sharing
+
+- The shortlist view now includes a **Share shortlist recap** button that creates a pastel SVG recap card using the top three ranked dresses.
+- Selection logic:
+  - shortlisted dresses are ranked first by the session score;
+  - if fewer than three shortlisted dresses exist, the remaining slots are filled from the best-ranked dresses in the full session result.
+- The generated recap currently uses an SVG-based soft pink background so it works without bundling a separate image asset.
+- If you want to swap in your own JPEG/PNG background:
+  1. add the asset to `Mobile_version/assets/` (for example `session-share-background.png`);
+  2. resolve it in `SessionScreen.tsx` with `Image.resolveAssetSource(require('../../assets/session-share-background.png')).uri`;
+  3. pass that URI into the SVG generator in `src/utils/sessionShare.ts` and render it with an SVG `<image ... />` as the background layer.

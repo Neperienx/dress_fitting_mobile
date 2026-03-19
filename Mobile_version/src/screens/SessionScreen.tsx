@@ -11,6 +11,7 @@ import {
   Pressable,
   SafeAreaView,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +20,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
@@ -34,6 +36,7 @@ import {
   prependSessionHistory,
   updateSessionHistoryRecord
 } from '../utils/sessionHistory';
+import { buildSessionRecapSvg, selectShareTopDresses } from '../utils/sessionShare';
 import { syncInventoryForStore } from '../utils/inventoryCache';
 
 const englishTagCatalog = require('../data/dress-tags.en.json') as {
@@ -149,6 +152,7 @@ export default function SessionScreen() {
   const [feedbackComment, setFeedbackComment] = useState('');
   const [feedbackSubmittedAt, setFeedbackSubmittedAt] = useState<string | null>(null);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [shareGenerating, setShareGenerating] = useState(false);
 
   const swipePosition = useRef(new Animated.ValueXY()).current;
 
@@ -465,6 +469,15 @@ export default function SessionScreen() {
       .sort((a, b) => b.score - a.score);
   }, [activeSessionData.allStoreDresses, activeSessionData.tagScores]);
 
+  const shareTopDresses = useMemo(
+    () =>
+      selectShareTopDresses({
+        shortlistDressIds: activeSessionData.shortlistDressIds,
+        rankedDresses
+      }),
+    [activeSessionData.shortlistDressIds, rankedDresses]
+  );
+
   const rankedTags = useMemo(
     () =>
       Object.entries(activeSessionData.tagScores)
@@ -612,6 +625,47 @@ export default function SessionScreen() {
   useEffect(() => {
     void persistSessionFeedbackLocally();
   }, [persistSessionFeedbackLocally]);
+
+  const handleShareShortlist = useCallback(async () => {
+    if (shareTopDresses.length === 0) {
+      Alert.alert('Nothing to share yet', 'Run a session with ranked dresses before sharing a recap.');
+      return;
+    }
+
+    if (!FileSystem.cacheDirectory) {
+      Alert.alert('Sharing unavailable', 'The device did not provide a writable cache directory.');
+      return;
+    }
+
+    try {
+      setShareGenerating(true);
+      const recapSvg = buildSessionRecapSvg({
+        brideName: activeSessionData.brideName,
+        storeName: selectedStore?.name || 'Bridal Studio',
+        dresses: shareTopDresses
+      });
+      const fileName = `session-recap-${savedSessionId ?? Date.now()}.svg`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(fileUri, recapSvg, {
+        encoding: FileSystem.EncodingType.UTF8
+      });
+
+      await Share.share({
+        title: `${activeSessionData.brideName.trim() || 'Bride'} session recap`,
+        message: `${activeSessionData.brideName.trim() || 'Bride'}'s top dress recap from ${selectedStore?.name || 'Bridal Studio'}`,
+        url: fileUri
+      });
+    } catch (error) {
+      console.warn('Could not share shortlist recap', error);
+      Alert.alert(
+        'Share failed',
+        error instanceof Error ? error.message : 'We could not generate the recap image for sharing.'
+      );
+    } finally {
+      setShareGenerating(false);
+    }
+  }, [activeSessionData.brideName, savedSessionId, selectedStore?.name, shareTopDresses]);
 
   const renderFeedbackSection = () => (
     <View style={styles.feedbackCard}>
@@ -918,6 +972,18 @@ export default function SessionScreen() {
             );
           })
         )}
+        {showShortlistOnly ? (
+          <Pressable
+            style={[styles.shareButton, shareGenerating && styles.shareButtonDisabled]}
+            onPress={() => void handleShareShortlist()}
+            disabled={shareGenerating}
+          >
+            <Text style={styles.shareButtonText}>{shareGenerating ? 'Generating recap…' : 'Share shortlist recap'}</Text>
+            <Text style={styles.shareButtonHint}>
+              Shares the top 3 looks, prioritising shortlisted dresses and filling from the session ranking when needed.
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     );
   };
@@ -1321,6 +1387,28 @@ const styles = StyleSheet.create({
   shortlistStar: { color: '#CBBFC4', fontSize: 24, lineHeight: 24 },
   shortlistStarActive: { color: '#E6B94A' },
   decisionPill: { color: '#766971', fontSize: 12, fontWeight: '600' },
+  shareButton: {
+    marginTop: 6,
+    borderRadius: 18,
+    backgroundColor: '#DEA9B6',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 6
+  },
+  shareButtonDisabled: {
+    opacity: 0.72
+  },
+  shareButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center'
+  },
+  shareButtonHint: {
+    color: '#FFF7FA',
+    fontSize: 12,
+    textAlign: 'center'
+  },
   profileModalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(20, 12, 16, 0.52)',
