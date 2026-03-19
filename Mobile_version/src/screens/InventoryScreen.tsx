@@ -36,29 +36,65 @@ type Dress = {
 
 type Props = NativeStackScreenProps<StoresStackParamList, 'Inventory'>;
 
+type PickerAsset = {
+  uri: string;
+  base64?: string | null;
+  mimeType?: string | null;
+};
+
 type MaybeImagePickerModule = {
   requestMediaLibraryPermissionsAsync: () => Promise<{ granted: boolean }>;
   launchImageLibraryAsync: (options: {
     mediaTypes: string[];
     allowsMultipleSelection: boolean;
     quality: number;
-  }) => Promise<{ canceled: boolean; assets: { uri: string }[] }>;
+    base64?: boolean;
+  }) => Promise<{ canceled: boolean; assets: PickerAsset[] }>;
 };
 
 type MaybeDocumentPickerModule = {
   getDocumentAsync: (options: {
     type: string;
     multiple: boolean;
-  }) => Promise<{ canceled: boolean; assets: { uri: string }[] }>;
+  }) => Promise<{ canceled: boolean; assets: PickerAsset[] }>;
 };
 
 const emptyPhotoField: string[] = [];
+const inventoryUploadQuality = 0.72;
 
 const allowedImageUriSchemes = ['http://', 'https://', 'file://', 'content://', 'data:image/'];
 
 function isSupportedImageUri(value: string) {
   const normalized = value.trim().toLowerCase();
   return allowedImageUriSchemes.some((scheme) => normalized.startsWith(scheme));
+}
+
+function getNormalizedImageMimeType(mimeType?: string | null) {
+  if (typeof mimeType === 'string' && mimeType.toLowerCase().startsWith('image/')) {
+    return mimeType.toLowerCase();
+  }
+
+  return 'image/jpeg';
+}
+
+function getOptimizedStorageUri(asset: PickerAsset) {
+  if (asset.base64 && asset.base64.trim().length > 0) {
+    return `data:${getNormalizedImageMimeType(asset.mimeType)};base64,${asset.base64}`;
+  }
+
+  return asset.uri.trim();
+}
+
+function getImageStorageSavingsMessage(optimizedCount: number, totalCount: number) {
+  if (optimizedCount === totalCount) {
+    return 'All selected photos will be optimized before they are saved.';
+  }
+
+  if (optimizedCount > 0) {
+    return `${optimizedCount} of ${totalCount} selected photo(s) will be optimized before saving.`;
+  }
+
+  return 'Selected photos will be saved as-is because this picker could not provide compressible image data.';
 }
 
 function getErrorMessage(error: unknown) {
@@ -132,6 +168,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
   const [dressName, setDressName] = useState('');
   const [priceText, setPriceText] = useState('');
   const [photoUrls, setPhotoUrls] = useState<string[]>(emptyPhotoField);
+  const [optimizedPhotoCount, setOptimizedPhotoCount] = useState(0);
   const [savingDress, setSavingDress] = useState(false);
 
   const loadDresses = useCallback(async () => {
@@ -159,6 +196,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
     setDressName('');
     setPriceText('');
     setPhotoUrls(emptyPhotoField);
+    setOptimizedPhotoCount(0);
   }, []);
 
   const openCreateModal = useCallback(() => {
@@ -174,12 +212,20 @@ export default function InventoryScreen({ route, navigation }: Props) {
     setShowCreateDressModal(false);
   }, [savingDress]);
 
-  const appendPhotoUris = useCallback((uris: string[]) => {
-    if (uris.length === 0) {
+  const appendPhotoAssets = useCallback((assets: PickerAsset[]) => {
+    if (assets.length === 0) {
       return;
     }
 
-    setPhotoUrls((previous) => [...previous, ...uris]);
+    const optimizedUris = assets.map(getOptimizedStorageUri).filter(Boolean);
+    const optimizedCountDelta = assets.filter((asset) => Boolean(asset.base64 && asset.base64.trim().length > 0)).length;
+
+    if (optimizedUris.length === 0) {
+      return;
+    }
+
+    setPhotoUrls((previous) => [...previous, ...optimizedUris]);
+    setOptimizedPhotoCount((previous) => previous + optimizedCountDelta);
   }, []);
 
   const pickFromGallery = useCallback(async () => {
@@ -198,15 +244,16 @@ export default function InventoryScreen({ route, navigation }: Props) {
     const result = await imagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
-      quality: 1
+      quality: inventoryUploadQuality,
+      base64: true
     });
 
     if (result.canceled) {
       return;
     }
 
-    appendPhotoUris(result.assets.map((asset) => asset.uri));
-  }, [appendPhotoUris]);
+    appendPhotoAssets(result.assets);
+  }, [appendPhotoAssets]);
 
   const pickFromFiles = useCallback(async () => {
     const documentPicker = loadDocumentPickerModule();
@@ -224,11 +271,12 @@ export default function InventoryScreen({ route, navigation }: Props) {
       return;
     }
 
-    appendPhotoUris(result.assets.map((asset) => asset.uri));
-  }, [appendPhotoUris]);
+    appendPhotoAssets(result.assets);
+  }, [appendPhotoAssets]);
 
   const clearPhotos = useCallback(() => {
     setPhotoUrls([]);
+    setOptimizedPhotoCount(0);
   }, []);
 
   const createDress = useCallback(async () => {
@@ -394,7 +442,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
 
             <Text style={styles.photoSectionLabel}>Photos (at least one required)</Text>
             <Text style={styles.photoSectionHint}>
-              Choose images from your gallery or files. You can keep adding more photos anytime.
+              Choose images from your gallery or files. Gallery picks are compressed to keep storage usage lower while preserving good quality.
             </Text>
             <View style={styles.photoButtonRow}>
               <Pressable style={[styles.photoPickerButton, styles.filesButton]} onPress={() => void pickFromFiles()}>
@@ -416,6 +464,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
                 </View>
                 <View style={styles.previewMeta}>
                   <Text style={styles.previewCount}>{photoUrls.length} photo(s) selected</Text>
+                  <Text style={styles.previewHint}>{getImageStorageSavingsMessage(optimizedPhotoCount, photoUrls.length)}</Text>
                   <Pressable style={styles.clearPhotosButton} onPress={clearPhotos}>
                     <Text style={styles.clearPhotosButtonText}>Clear</Text>
                   </Pressable>
@@ -514,8 +563,9 @@ const styles = StyleSheet.create({
   },
   previewPhotoBack: { position: 'absolute', top: 8, left: 8, backgroundColor: '#ece9f8' },
   previewPhotoFront: { position: 'absolute', top: 3, left: 3 },
-  previewMeta: { gap: 2 },
+  previewMeta: { gap: 2, flex: 1 },
   previewCount: { color: '#4a4561', fontWeight: '600' },
+  previewHint: { color: '#7b7690', fontSize: 12, lineHeight: 16 },
   clearPhotosButton: { alignSelf: 'flex-start', paddingVertical: 2 },
   clearPhotosButtonText: { color: '#70688f', fontWeight: '600' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
