@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type SwipeDecision = 'like' | 'dislike' | 'superlike';
+export type SessionFeedbackReaction = 'up' | 'down' | 'comment';
 
 export type SessionPreviewDress = {
   id: string;
@@ -30,6 +31,8 @@ export type SavedSession = {
   tagScores: Record<string, TagSummary>;
   dressDecisions: Record<string, SwipeDecision>;
   shortlistDressIds?: string[];
+  feedbackReaction?: SessionFeedbackReaction;
+  feedbackComment?: string;
 };
 
 function getSessionHistoryKey(storeId: string) {
@@ -57,5 +60,15 @@ export async function loadSessionHistory(storeId: string): Promise<SavedSession[
 export async function prependSessionHistory(storeId: string, record: SavedSession) {
   const existing = await loadSessionHistory(storeId);
   const next = [record, ...existing].slice(0, 100);
+  await AsyncStorage.setItem(getSessionHistoryKey(storeId), JSON.stringify(next));
+}
+
+export async function updateSessionHistoryRecord(
+  storeId: string,
+  sessionId: string,
+  updates: Partial<Pick<SavedSession, 'shortlistDressIds' | 'feedbackReaction' | 'feedbackComment'>>
+) {
+  const existing = await loadSessionHistory(storeId);
+  const next = existing.map((entry) => (entry.id === sessionId ? { ...entry, ...updates } : entry));
   await AsyncStorage.setItem(getSessionHistoryKey(storeId), JSON.stringify(next));
 }
