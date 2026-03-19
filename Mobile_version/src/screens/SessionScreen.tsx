@@ -147,7 +147,6 @@ export default function SessionScreen() {
   const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
   const [feedbackReaction, setFeedbackReaction] = useState<SessionFeedbackReaction | null>(null);
   const [feedbackComment, setFeedbackComment] = useState('');
-  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   const swipePosition = useRef(new Animated.ValueXY()).current;
 
@@ -508,107 +507,45 @@ export default function SessionScreen() {
 
   const feedbackControlsVisible = feedbackReaction === 'comment' || feedbackComment.trim().length > 0;
 
-  const applyMetadataToSessionState = useCallback(
-    (updates: Partial<Pick<SavedSession, 'shortlistDressIds' | 'feedbackReaction' | 'feedbackComment'>>) => {
-      if (!savedSessionId) {
-        return;
-      }
-
-      setRecentSessions((previous) =>
-        previous.map((entry) => (entry.id === savedSessionId ? { ...entry, ...updates } : entry))
-      );
-
-      setSelectedHistorySession((previous) =>
-        previous && previous.id === savedSessionId ? { ...previous, ...updates } : previous
-      );
-    },
-    [savedSessionId]
-  );
-
-  const persistSessionMetadata = useCallback(
-    async (updates: Partial<Pick<SavedSession, 'shortlistDressIds' | 'feedbackReaction' | 'feedbackComment'>>) => {
-      if (!selectedStore?.id || !savedSessionId) {
-        return;
-      }
-
-      await updateSessionHistoryRecord(selectedStore.id, savedSessionId, updates);
-      applyMetadataToSessionState(updates);
-    },
-    [applyMetadataToSessionState, savedSessionId, selectedStore?.id]
-  );
-
   useEffect(() => {
     if (sessionStage !== 'results' || !selectedStore?.id || !savedSessionId) {
       return;
     }
 
-    void persistSessionMetadata({ shortlistDressIds });
-  }, [persistSessionMetadata, savedSessionId, selectedStore?.id, sessionStage, shortlistDressIds]);
+    const nextFeedbackComment = feedbackComment.trim();
 
-  const submitFeedback = useCallback(async () => {
-    if (!selectedStore?.id || !savedSessionId || !session?.user.id) {
-      Alert.alert('Could not submit feedback', 'Please reopen the session and try again.');
-      return;
-    }
-
-    const trimmedComment = feedbackComment.trim();
-    const nextReaction = feedbackReaction ?? (trimmedComment ? 'comment' : null);
-
-    if (!nextReaction && !trimmedComment) {
-      Alert.alert('Add feedback', 'Choose a reaction or write a comment before submitting.');
-      return;
-    }
-
-    try {
-      setSubmittingFeedback(true);
-
-      await persistSessionMetadata({
+    void (async () => {
+      await updateSessionHistoryRecord(selectedStore.id, savedSessionId, {
         shortlistDressIds,
-        feedbackReaction: nextReaction ?? undefined,
-        feedbackComment: trimmedComment || undefined
+        feedbackReaction: feedbackReaction ?? undefined,
+        feedbackComment: nextFeedbackComment || undefined
       });
 
-      assertSupabaseConfigured();
-      const { error } = await supabase.from('session_feedback').upsert(
-        {
-          studio_id: selectedStore.id,
-          submitted_by: session.user.id,
-          local_session_id: savedSessionId,
-          bride_name: activeSessionData.brideName.trim() || 'Session',
-          feedback_reaction: nextReaction,
-          feedback_comment: trimmedComment || null
-        },
-        { onConflict: 'studio_id,local_session_id' }
+      setRecentSessions((previous) =>
+        previous.map((entry) =>
+          entry.id === savedSessionId
+            ? {
+                ...entry,
+                shortlistDressIds,
+                feedbackReaction: feedbackReaction ?? undefined,
+                feedbackComment: nextFeedbackComment || undefined
+              }
+            : entry
+        )
       );
 
-      if (error) {
-        throw error;
-      }
-
-      setFeedbackReaction(nextReaction);
-      Alert.alert('Feedback submitted', 'Shortlist feedback has been synced to Supabase.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to sync feedback right now.';
-      console.error('[SessionScreen] Failed to submit shortlist feedback', {
-        savedSessionId,
-        storeId: selectedStore.id,
-        userId: session?.user.id,
-        error
-      });
-      Alert.alert('Could not submit feedback', message);
-    } finally {
-      setSubmittingFeedback(false);
-    }
-  }, [
-    activeSessionData.brideName,
-    feedbackComment,
-    feedbackReaction,
-    persistSessionMetadata,
-    savedSessionId,
-    selectedStore?.id,
-    session?.user.id,
-    shortlistDressIds
-  ]);
+      setSelectedHistorySession((previous) =>
+        previous && previous.id === savedSessionId
+          ? {
+              ...previous,
+              shortlistDressIds,
+              feedbackReaction: feedbackReaction ?? undefined,
+              feedbackComment: nextFeedbackComment || undefined
+            }
+          : previous
+      );
+    })();
+  }, [feedbackComment, feedbackReaction, savedSessionId, selectedStore?.id, sessionStage, shortlistDressIds]);
 
   const renderFeedbackSection = () => (
     <View style={styles.feedbackCard}>
@@ -643,13 +580,6 @@ export default function SessionScreen() {
           textAlignVertical="top"
         />
       ) : null}
-      <Pressable
-        style={[styles.primaryButton, styles.feedbackSubmitButton, submittingFeedback && styles.feedbackSubmitButtonDisabled]}
-        onPress={() => void submitFeedback()}
-        disabled={submittingFeedback}
-      >
-        <Text style={styles.primaryButtonText}>{submittingFeedback ? 'Submitting…' : 'Submit feedback'}</Text>
-      </Pressable>
     </View>
   );
 
@@ -871,7 +801,7 @@ export default function SessionScreen() {
 
     return (
       <ScrollView contentContainerStyle={styles.resultsContent}>
-        {showShortlistOnly ? renderFeedbackSection() : null}
+        {renderFeedbackSection()}
         <Text style={styles.resultsTitle}>{showShortlistOnly ? 'Shortlisted dresses' : 'Store ranking'}</Text>
         {dressesToShow.length === 0 ? (
           <Text style={styles.placeholderHint}>No dresses yet. Tap ☆ on a dress to build a shortlist.</Text>
@@ -1264,8 +1194,6 @@ const styles = StyleSheet.create({
   },
   feedbackIcon: { fontSize: 20 },
   feedbackInput: { minHeight: 92 },
-  feedbackSubmitButton: { marginTop: 0, maxWidth: '100%' },
-  feedbackSubmitButtonDisabled: { opacity: 0.6 },
   resultsTitle: { fontSize: 21, fontWeight: '700', color: '#433A3F' },
   resultsSubtitle: { color: '#8B7E83' },
   analyticsCategorySection: { gap: 8 },
