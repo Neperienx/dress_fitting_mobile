@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
+import { assertSupabaseConfigured, supabase } from '../lib/supabase';
 import { 
   SavedSession,
   SessionDress,
