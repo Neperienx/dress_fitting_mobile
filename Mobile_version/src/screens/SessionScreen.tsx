@@ -25,11 +25,13 @@ import { useStore } from '../context/StoreContext';
 import { 
   SavedSession,
   SessionDress,
+  SessionFeedbackReaction,
   SessionPreviewDress,
   SwipeDecision,
   TagSummary,
   loadSessionHistory,
-  prependSessionHistory
+  prependSessionHistory,
+  updateSessionHistoryRecord
 } from '../utils/sessionHistory';
 import { syncInventoryForStore } from '../utils/inventoryCache';
 
@@ -141,6 +143,9 @@ export default function SessionScreen() {
   const [selectedResultDressId, setSelectedResultDressId] = useState<string | null>(null);
   const [shortlistDressIds, setShortlistDressIds] = useState<string[]>([]);
   const [showShortlistOnly, setShowShortlistOnly] = useState(false);
+  const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
+  const [feedbackReaction, setFeedbackReaction] = useState<SessionFeedbackReaction | null>(null);
+  const [feedbackComment, setFeedbackComment] = useState('');
 
   const swipePosition = useRef(new Animated.ValueXY()).current;
 
@@ -213,6 +218,9 @@ export default function SessionScreen() {
       setSessionStage('landing');
       setLandingTab('start');
       setSelectedHistorySession(null);
+      setSavedSessionId(null);
+      setFeedbackReaction(null);
+      setFeedbackComment('');
       setActiveTab('analytics');
       navigation.setParams({ resetToStart: undefined });
       return;
@@ -228,6 +236,9 @@ export default function SessionScreen() {
       if (hit) {
         setSelectedHistorySession(hit);
         setShortlistDressIds(hit.shortlistDressIds ?? []);
+        setFeedbackReaction(hit.feedbackReaction ?? null);
+        setFeedbackComment(hit.feedbackComment ?? '');
+        setSavedSessionId(hit.id);
         setShowShortlistOnly(false);
         setSessionStage('results');
         setActiveTab('analytics');
@@ -363,6 +374,9 @@ export default function SessionScreen() {
     setSelectedResultDressId(null);
     setShortlistDressIds([]);
     setShowShortlistOnly(false);
+    setSavedSessionId(null);
+    setFeedbackReaction(null);
+    setFeedbackComment('');
     setLandingTab('start');
     setActiveTab('analytics');
     setShowSessionForm(false);
@@ -374,8 +388,9 @@ export default function SessionScreen() {
       return;
     }
 
+    const recordId = `${Date.now()}`;
     const record: SavedSession = {
-      id: `${Date.now()}`,
+      id: recordId,
       storeId: selectedStore.id,
       brideName: brideName.trim() || 'Session',
       endedAt: new Date().toISOString(),
@@ -383,11 +398,14 @@ export default function SessionScreen() {
       allStoreDresses,
       tagScores,
       dressDecisions,
-      shortlistDressIds
+      shortlistDressIds,
+      feedbackReaction: feedbackReaction ?? undefined,
+      feedbackComment: feedbackComment.trim() || undefined
     };
 
     void (async () => {
       await prependSessionHistory(selectedStore.id, record);
+      setSavedSessionId(recordId);
       setSessionSaved(true);
       await loadRecentSessions();
     })();
@@ -402,7 +420,9 @@ export default function SessionScreen() {
     sessionSaved,
     sessionStage,
     shortlistDressIds,
-    tagScores
+    tagScores,
+    feedbackComment,
+    feedbackReaction
   ]);
 
   const activeSessionData = selectedHistorySession
@@ -412,7 +432,9 @@ export default function SessionScreen() {
         allStoreDresses: selectedHistorySession.allStoreDresses,
         tagScores: selectedHistorySession.tagScores,
         dressDecisions: selectedHistorySession.dressDecisions,
-        shortlistDressIds
+        shortlistDressIds,
+        feedbackReaction,
+        feedbackComment
       }
     : {
         brideName,
@@ -420,7 +442,9 @@ export default function SessionScreen() {
         allStoreDresses,
         tagScores,
         dressDecisions,
-        shortlistDressIds
+        shortlistDressIds,
+        feedbackReaction,
+        feedbackComment
       };
 
   const rankedDresses = useMemo(() => {
@@ -479,6 +503,84 @@ export default function SessionScreen() {
       previous.includes(dressId) ? previous.filter((id) => id !== dressId) : [...previous, dressId]
     );
   }, []);
+
+  const feedbackControlsVisible = feedbackReaction === 'comment' || feedbackComment.trim().length > 0;
+
+  useEffect(() => {
+    if (sessionStage !== 'results' || !selectedStore?.id || !savedSessionId) {
+      return;
+    }
+
+    const nextFeedbackComment = feedbackComment.trim();
+
+    void (async () => {
+      await updateSessionHistoryRecord(selectedStore.id, savedSessionId, {
+        shortlistDressIds,
+        feedbackReaction: feedbackReaction ?? undefined,
+        feedbackComment: nextFeedbackComment || undefined
+      });
+
+      setRecentSessions((previous) =>
+        previous.map((entry) =>
+          entry.id === savedSessionId
+            ? {
+                ...entry,
+                shortlistDressIds,
+                feedbackReaction: feedbackReaction ?? undefined,
+                feedbackComment: nextFeedbackComment || undefined
+              }
+            : entry
+        )
+      );
+
+      setSelectedHistorySession((previous) =>
+        previous && previous.id === savedSessionId
+          ? {
+              ...previous,
+              shortlistDressIds,
+              feedbackReaction: feedbackReaction ?? undefined,
+              feedbackComment: nextFeedbackComment || undefined
+            }
+          : previous
+      );
+    })();
+  }, [feedbackComment, feedbackReaction, savedSessionId, selectedStore?.id, sessionStage, shortlistDressIds]);
+
+  const renderFeedbackSection = () => (
+    <View style={styles.feedbackCard}>
+      <Text style={styles.feedbackQuestion}>Did we help you find the perfect dress?</Text>
+      <View style={styles.feedbackActionsRow}>
+        <Pressable
+          style={[styles.feedbackActionButton, feedbackReaction === 'up' && styles.feedbackActionButtonActive]}
+          onPress={() => setFeedbackReaction((previous) => (previous === 'up' ? null : 'up'))}
+        >
+          <Text style={styles.feedbackIcon}>👍</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.feedbackActionButton, feedbackReaction === 'down' && styles.feedbackActionButtonActive]}
+          onPress={() => setFeedbackReaction((previous) => (previous === 'down' ? null : 'down'))}
+        >
+          <Text style={styles.feedbackIcon}>👎</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.feedbackActionButton, feedbackControlsVisible && styles.feedbackActionButtonActive]}
+          onPress={() => setFeedbackReaction((previous) => (previous === 'comment' && !feedbackComment.trim() ? null : 'comment'))}
+        >
+          <Text style={styles.feedbackIcon}>💬</Text>
+        </Pressable>
+      </View>
+      {feedbackControlsVisible ? (
+        <TextInput
+          style={[styles.input, styles.feedbackInput]}
+          placeholder="Share your feedback"
+          value={feedbackComment}
+          onChangeText={setFeedbackComment}
+          multiline
+          textAlignVertical="top"
+        />
+      ) : null}
+    </View>
+  );
 
   const tagsByCategory = useMemo(() => {
     const categoryByTag = new Map<string, string>();
@@ -566,6 +668,9 @@ export default function SessionScreen() {
                 onPress={() => {
                   setSelectedHistorySession(entry);
                   setShortlistDressIds(entry.shortlistDressIds ?? []);
+                  setFeedbackReaction(entry.feedbackReaction ?? null);
+                  setFeedbackComment(entry.feedbackComment ?? '');
+                  setSavedSessionId(entry.id);
                   setShowShortlistOnly(false);
                   setActiveTab('analytics');
                   setSessionStage('results');
@@ -695,6 +800,7 @@ export default function SessionScreen() {
 
     return (
       <ScrollView contentContainerStyle={styles.resultsContent}>
+        {renderFeedbackSection()}
         <Text style={styles.resultsTitle}>{showShortlistOnly ? 'Shortlisted dresses' : 'Store ranking'}</Text>
         {dressesToShow.length === 0 ? (
           <Text style={styles.placeholderHint}>No dresses yet. Tap ☆ on a dress to build a shortlist.</Text>
@@ -766,6 +872,9 @@ export default function SessionScreen() {
               setSelectedHistorySession(null);
               setSelectedResultDressId(null);
               setShowShortlistOnly(false);
+              setSavedSessionId(null);
+              setFeedbackReaction(null);
+              setFeedbackComment('');
               setLandingTab('recent');
             }}
           >
@@ -1058,6 +1167,32 @@ const styles = StyleSheet.create({
   tabText: { color: '#8B7E83', fontWeight: '600' },
   tabTextActive: { color: '#433A3F' },
   resultsContent: { paddingHorizontal: 20, paddingVertical: 14, gap: 12, paddingBottom: 30 },
+  feedbackCard: {
+    borderWidth: 1,
+    borderColor: '#ECE2E7',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    gap: 12
+  },
+  feedbackQuestion: { color: '#433A3F', fontSize: 16, fontWeight: '700' },
+  feedbackActionsRow: { flexDirection: 'row', gap: 12 },
+  feedbackActionButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8F1F4',
+    borderWidth: 1,
+    borderColor: '#EFE5E9'
+  },
+  feedbackActionButtonActive: {
+    backgroundColor: '#F3DCE3',
+    borderColor: '#DEA9B6'
+  },
+  feedbackIcon: { fontSize: 20 },
+  feedbackInput: { minHeight: 92 },
   resultsTitle: { fontSize: 21, fontWeight: '700', color: '#433A3F' },
   resultsSubtitle: { color: '#8B7E83' },
   analyticsCategorySection: { gap: 8 },
