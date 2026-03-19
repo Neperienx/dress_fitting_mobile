@@ -33,6 +33,7 @@ export type SavedSession = {
   shortlistDressIds?: string[];
   feedbackReaction?: SessionFeedbackReaction;
   feedbackComment?: string;
+  feedbackSubmittedAt?: string;
 };
 
 function getSessionHistoryKey(storeId: string) {
@@ -66,7 +67,9 @@ export async function prependSessionHistory(storeId: string, record: SavedSessio
 export async function updateSessionHistoryRecord(
   storeId: string,
   sessionId: string,
-  updates: Partial<Pick<SavedSession, 'shortlistDressIds' | 'feedbackReaction' | 'feedbackComment'>>
+  updates: Partial<
+    Pick<SavedSession, 'shortlistDressIds' | 'feedbackReaction' | 'feedbackComment' | 'feedbackSubmittedAt'>
+  >
 ) {
   const existing = await loadSessionHistory(storeId);
   const next = existing.map((entry) => (entry.id === sessionId ? { ...entry, ...updates } : entry));
