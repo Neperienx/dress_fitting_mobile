@@ -147,6 +147,8 @@ export default function SessionScreen() {
   const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
   const [feedbackReaction, setFeedbackReaction] = useState<SessionFeedbackReaction | null>(null);
   const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackSubmittedAt, setFeedbackSubmittedAt] = useState<string | null>(null);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
 
   const swipePosition = useRef(new Animated.ValueXY()).current;
 
@@ -222,6 +224,7 @@ export default function SessionScreen() {
       setSavedSessionId(null);
       setFeedbackReaction(null);
       setFeedbackComment('');
+      setFeedbackSubmittedAt(null);
       setActiveTab('analytics');
       navigation.setParams({ resetToStart: undefined });
       return;
@@ -239,6 +242,7 @@ export default function SessionScreen() {
         setShortlistDressIds(hit.shortlistDressIds ?? []);
         setFeedbackReaction(hit.feedbackReaction ?? null);
         setFeedbackComment(hit.feedbackComment ?? '');
+        setFeedbackSubmittedAt(hit.feedbackSubmittedAt ?? null);
         setSavedSessionId(hit.id);
         setShowShortlistOnly(false);
         setSessionStage('results');
@@ -378,6 +382,7 @@ export default function SessionScreen() {
     setSavedSessionId(null);
     setFeedbackReaction(null);
     setFeedbackComment('');
+    setFeedbackSubmittedAt(null);
     setLandingTab('start');
     setActiveTab('analytics');
     setShowSessionForm(false);
@@ -401,7 +406,8 @@ export default function SessionScreen() {
       dressDecisions,
       shortlistDressIds,
       feedbackReaction: feedbackReaction ?? undefined,
-      feedbackComment: feedbackComment.trim() || undefined
+      feedbackComment: feedbackComment.trim() || undefined,
+      feedbackSubmittedAt: undefined
     };
 
     void (async () => {
@@ -435,7 +441,8 @@ export default function SessionScreen() {
         dressDecisions: selectedHistorySession.dressDecisions,
         shortlistDressIds,
         feedbackReaction,
-        feedbackComment
+        feedbackComment,
+        feedbackSubmittedAt
       }
     : {
         brideName,
@@ -445,7 +452,8 @@ export default function SessionScreen() {
         dressDecisions,
         shortlistDressIds,
         feedbackReaction,
-        feedbackComment
+        feedbackComment,
+        feedbackSubmittedAt
       };
 
   const rankedDresses = useMemo(() => {
@@ -506,29 +514,29 @@ export default function SessionScreen() {
   }, []);
 
   const feedbackControlsVisible = feedbackReaction === 'comment' || feedbackComment.trim().length > 0;
+  const persistSessionFeedbackLocally = useCallback(
+    async (updates?: Partial<SavedSession>) => {
+      if (sessionStage !== 'results' || !selectedStore?.id || !savedSessionId) {
+        return;
+      }
 
-  useEffect(() => {
-    if (sessionStage !== 'results' || !selectedStore?.id || !savedSessionId) {
-      return;
-    }
-
-    const nextFeedbackComment = feedbackComment.trim();
-
-    void (async () => {
-      await updateSessionHistoryRecord(selectedStore.id, savedSessionId, {
+      const nextFeedbackComment = feedbackComment.trim();
+      const mergedUpdates = {
         shortlistDressIds,
         feedbackReaction: feedbackReaction ?? undefined,
-        feedbackComment: nextFeedbackComment || undefined
-      });
+        feedbackComment: nextFeedbackComment || undefined,
+        feedbackSubmittedAt: feedbackSubmittedAt ?? undefined,
+        ...updates
+      };
+
+      await updateSessionHistoryRecord(selectedStore.id, savedSessionId, mergedUpdates);
 
       setRecentSessions((previous) =>
         previous.map((entry) =>
           entry.id === savedSessionId
             ? {
                 ...entry,
-                shortlistDressIds,
-                feedbackReaction: feedbackReaction ?? undefined,
-                feedbackComment: nextFeedbackComment || undefined
+                ...mergedUpdates
               }
             : entry
         )
@@ -538,14 +546,72 @@ export default function SessionScreen() {
         previous && previous.id === savedSessionId
           ? {
               ...previous,
-              shortlistDressIds,
-              feedbackReaction: feedbackReaction ?? undefined,
-              feedbackComment: nextFeedbackComment || undefined
+              ...mergedUpdates
             }
           : previous
       );
-    })();
-  }, [feedbackComment, feedbackReaction, savedSessionId, selectedStore?.id, sessionStage, shortlistDressIds]);
+    },
+    [feedbackComment, feedbackReaction, feedbackSubmittedAt, savedSessionId, selectedStore?.id, sessionStage, shortlistDressIds]
+  );
+
+  const handleSubmitFeedback = useCallback(async () => {
+    if (!selectedStore?.id || !savedSessionId || !session?.user.id) {
+      Alert.alert('Session unavailable', 'Open a saved shortlist session before submitting feedback.');
+      return;
+    }
+
+    const nextFeedbackComment = feedbackComment.trim();
+    const hasFeedback = Boolean(feedbackReaction || nextFeedbackComment);
+    if (!hasFeedback) {
+      Alert.alert('Feedback required', 'Choose a reaction or add a comment before submitting.');
+      return;
+    }
+
+    try {
+      setFeedbackSubmitting(true);
+      assertSupabaseConfigured();
+
+      const { error } = await supabase.from('session_feedback').upsert(
+        {
+          studio_id: selectedStore.id,
+          submitted_by: session.user.id,
+          local_session_id: savedSessionId,
+          bride_name: activeSessionData.brideName.trim() || null,
+          feedback_reaction: feedbackReaction ?? null,
+          feedback_comment: nextFeedbackComment || null
+        },
+        {
+          onConflict: 'studio_id,local_session_id'
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      const submittedAt = new Date().toISOString();
+      setFeedbackSubmittedAt(submittedAt);
+      await persistSessionFeedbackLocally({ feedbackSubmittedAt: submittedAt });
+      Alert.alert('Feedback submitted', 'Your shortlist feedback was synced with Supabase.');
+    } catch (error) {
+      console.warn('Could not submit session feedback', error);
+      Alert.alert('Submit failed', error instanceof Error ? error.message : 'We could not sync feedback with Supabase.');
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  }, [
+    activeSessionData.brideName,
+    feedbackComment,
+    feedbackReaction,
+    persistSessionFeedbackLocally,
+    savedSessionId,
+    selectedStore?.id,
+    session?.user.id
+  ]);
+
+  useEffect(() => {
+    void persistSessionFeedbackLocally();
+  }, [persistSessionFeedbackLocally]);
 
   const renderFeedbackSection = () => (
     <View style={styles.feedbackCard}>
@@ -579,6 +645,18 @@ export default function SessionScreen() {
           multiline
           textAlignVertical="top"
         />
+      ) : null}
+      <Pressable
+        style={[styles.feedbackSubmitButton, feedbackSubmitting && styles.feedbackSubmitButtonDisabled]}
+        onPress={() => void handleSubmitFeedback()}
+        disabled={feedbackSubmitting}
+      >
+        <Text style={styles.feedbackSubmitButtonText}>
+          {feedbackSubmitting ? 'Submitting…' : feedbackSubmittedAt ? 'Update feedback' : 'Submit feedback'}
+        </Text>
+      </Pressable>
+      {feedbackSubmittedAt ? (
+        <Text style={styles.feedbackStatusText}>Last synced {formatSessionDate(feedbackSubmittedAt)}</Text>
       ) : null}
     </View>
   );
@@ -671,6 +749,7 @@ export default function SessionScreen() {
                   setShortlistDressIds(entry.shortlistDressIds ?? []);
                   setFeedbackReaction(entry.feedbackReaction ?? null);
                   setFeedbackComment(entry.feedbackComment ?? '');
+                  setFeedbackSubmittedAt(entry.feedbackSubmittedAt ?? null);
                   setSavedSessionId(entry.id);
                   setShowShortlistOnly(false);
                   setActiveTab('analytics');
@@ -801,8 +880,8 @@ export default function SessionScreen() {
 
     return (
       <ScrollView contentContainerStyle={styles.resultsContent}>
-        {renderFeedbackSection()}
         <Text style={styles.resultsTitle}>{showShortlistOnly ? 'Shortlisted dresses' : 'Store ranking'}</Text>
+        {showShortlistOnly ? renderFeedbackSection() : null}
         {dressesToShow.length === 0 ? (
           <Text style={styles.placeholderHint}>No dresses yet. Tap ☆ on a dress to build a shortlist.</Text>
         ) : (
@@ -876,6 +955,7 @@ export default function SessionScreen() {
               setSavedSessionId(null);
               setFeedbackReaction(null);
               setFeedbackComment('');
+              setFeedbackSubmittedAt(null);
               setLandingTab('recent');
             }}
           >
@@ -1194,6 +1274,24 @@ const styles = StyleSheet.create({
   },
   feedbackIcon: { fontSize: 20 },
   feedbackInput: { minHeight: 92 },
+  feedbackSubmitButton: {
+    marginTop: 4,
+    backgroundColor: '#DEA9B6',
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center'
+  },
+  feedbackSubmitButtonDisabled: {
+    opacity: 0.7
+  },
+  feedbackSubmitButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700'
+  },
+  feedbackStatusText: {
+    color: '#8B7E83',
+    fontSize: 12
+  },
   resultsTitle: { fontSize: 21, fontWeight: '700', color: '#433A3F' },
   resultsSubtitle: { color: '#8B7E83' },
   analyticsCategorySection: { gap: 8 },
