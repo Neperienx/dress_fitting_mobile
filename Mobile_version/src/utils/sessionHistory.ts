@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type SwipeDecision = 'like' | 'dislike' | 'superlike';
-export type SessionFeedbackReaction = 'up' | 'down' | 'comment';
+export type SessionFeedbackReaction = 'up' | 'down';
 
 export type SessionPreviewDress = {
   id: string;

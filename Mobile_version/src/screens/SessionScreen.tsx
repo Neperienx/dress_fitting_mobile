@@ -526,7 +526,7 @@ export default function SessionScreen() {
     );
   }, []);
 
-  const feedbackControlsVisible = feedbackReaction === 'comment' || feedbackComment.trim().length > 0;
+  const hasFeedbackComment = feedbackComment.trim().length > 0;
   const shouldShowFeedbackSection = showShortlistOnly && !feedbackSubmittedAt;
   const persistSessionFeedbackLocally = useCallback(
     async (updates?: Partial<SavedSession>) => {
@@ -609,7 +609,16 @@ export default function SessionScreen() {
       Alert.alert('Feedback submitted', 'Your shortlist feedback was synced with Supabase.');
     } catch (error) {
       console.warn('Could not submit session feedback', error);
-      Alert.alert('Submit failed', error instanceof Error ? error.message : 'We could not sync feedback with Supabase.');
+
+      const errorCode = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : null;
+      const errorMessage =
+        errorCode === 'PGRST205'
+          ? 'Supabase is missing the session_feedback table. Run the latest Supabase migration, then try again.'
+          : error instanceof Error
+            ? error.message
+            : 'We could not sync feedback with Supabase.';
+
+      Alert.alert('Submit failed', errorMessage);
     } finally {
       setFeedbackSubmitting(false);
     }
@@ -684,23 +693,15 @@ export default function SessionScreen() {
         >
           <Text style={styles.feedbackIcon}>👎</Text>
         </Pressable>
-        <Pressable
-          style={[styles.feedbackActionButton, feedbackControlsVisible && styles.feedbackActionButtonActive]}
-          onPress={() => setFeedbackReaction((previous) => (previous === 'comment' && !feedbackComment.trim() ? null : 'comment'))}
-        >
-          <Text style={styles.feedbackIcon}>💬</Text>
-        </Pressable>
       </View>
-      {feedbackControlsVisible ? (
-        <TextInput
-          style={[styles.input, styles.feedbackInput]}
-          placeholder="Share your feedback"
-          value={feedbackComment}
-          onChangeText={setFeedbackComment}
-          multiline
-          textAlignVertical="top"
-        />
-      ) : null}
+      <TextInput
+        style={[styles.input, styles.feedbackInput, hasFeedbackComment && styles.feedbackInputActive]}
+        placeholder="Share your feedback (optional)"
+        value={feedbackComment}
+        onChangeText={setFeedbackComment}
+        multiline
+        textAlignVertical="top"
+      />
       <Pressable
         style={[styles.feedbackSubmitButton, feedbackSubmitting && styles.feedbackSubmitButtonDisabled]}
         onPress={() => void handleSubmitFeedback()}
@@ -1341,6 +1342,9 @@ const styles = StyleSheet.create({
   },
   feedbackIcon: { fontSize: 20 },
   feedbackInput: { minHeight: 92 },
+  feedbackInputActive: {
+    borderColor: '#D39AA4'
+  },
   feedbackSubmitButton: {
     marginTop: 4,
     backgroundColor: '#DEA9B6',
