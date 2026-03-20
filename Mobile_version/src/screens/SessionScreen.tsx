@@ -527,6 +527,7 @@ export default function SessionScreen() {
   }, []);
 
   const feedbackControlsVisible = feedbackReaction === 'comment' || feedbackComment.trim().length > 0;
+  const shouldShowFeedbackSection = showShortlistOnly && !feedbackSubmittedAt;
   const persistSessionFeedbackLocally = useCallback(
     async (updates?: Partial<SavedSession>) => {
       if (sessionStage !== 'results' || !selectedStore?.id || !savedSessionId) {
@@ -935,7 +936,7 @@ export default function SessionScreen() {
     return (
       <ScrollView contentContainerStyle={styles.resultsContent}>
         <Text style={styles.resultsTitle}>{showShortlistOnly ? 'Shortlisted dresses' : 'Store ranking'}</Text>
-        {showShortlistOnly ? renderFeedbackSection() : null}
+        {shouldShowFeedbackSection ? renderFeedbackSection() : null}
         {dressesToShow.length === 0 ? (
           <Text style={styles.placeholderHint}>No dresses yet. Tap ☆ on a dress to build a shortlist.</Text>
         ) : (
