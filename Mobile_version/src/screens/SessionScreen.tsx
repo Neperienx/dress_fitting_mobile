@@ -15,6 +15,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -123,6 +124,7 @@ function formatSessionDate(isoDate: string) {
 }
 
 export default function SessionScreen() {
+  const { width: windowWidth } = useWindowDimensions();
   const navigation = useNavigation<BottomTabNavigationProp<AppTabsParamList>>();
   const route = useRoute<{ params?: { open?: 'recent'; sessionId?: string; resetToStart?: boolean } }>();
   const { session } = useAuth();
@@ -262,6 +264,25 @@ export default function SessionScreen() {
     () => allStoreDresses.map(getPreviewImage).filter((image): image is string => Boolean(image)).slice(0, 3),
     [allStoreDresses]
   );
+  const previewLayout = useMemo(() => {
+    const contentHorizontalPadding = 40;
+    const layerOffsetX = 12;
+    const layerOffsetY = 6;
+    const visibleLayers = Math.max(Math.min(previewImages.length, 3), 1);
+    const stackDepth = visibleLayers - 1;
+    const availableWidth = Math.max(windowWidth - contentHorizontalPadding, 250);
+    const cardWidth = Math.min(Math.max(availableWidth - stackDepth * layerOffsetX - 6, 220), 380);
+    const cardHeight = Math.round(cardWidth * 1.38);
+
+    return {
+      cardWidth,
+      cardHeight,
+      layerOffsetX,
+      layerOffsetY,
+      wrapWidth: cardWidth + stackDepth * layerOffsetX,
+      wrapHeight: cardHeight + stackDepth * layerOffsetY + 8
+    };
+  }, [previewImages.length, windowWidth]);
 
   const swipedCount = swipeIndex;
   const currentDress = sessionQueue[swipeIndex] ?? null;
@@ -766,9 +787,23 @@ export default function SessionScreen() {
           <Text style={styles.title}>Start Session</Text>
           <Text style={styles.subtitle}>Swipe to Discover Dresses</Text>
 
-          <View style={styles.previewStackWrap}>
+          <View
+            style={[
+              styles.previewStackWrap,
+              {
+                width: previewLayout.wrapWidth,
+                height: previewLayout.wrapHeight
+              }
+            ]}
+          >
             {loadingPreview ? (
-              <View style={[styles.previewCard, styles.placeholderCard]}>
+              <View
+                style={[
+                  styles.previewCard,
+                  styles.placeholderCard,
+                  { width: previewLayout.cardWidth, height: previewLayout.cardHeight }
+                ]}
+              >
                 <ActivityIndicator color="#5b526f" />
               </View>
             ) : previewImages.length > 0 ? (
@@ -781,17 +816,30 @@ export default function SessionScreen() {
                     style={[
                       styles.layer,
                       {
-                        transform: [{ translateX: reverseIndex * 14 }, { translateY: reverseIndex * 6 }],
+                        transform: [
+                          { translateX: reverseIndex * previewLayout.layerOffsetX },
+                          { translateY: reverseIndex * previewLayout.layerOffsetY }
+                        ],
                         zIndex: 5 - reverseIndex
                       }
                     ]}
                   >
-                    <Image source={{ uri: image }} style={styles.previewCard} resizeMode="cover" />
+                    <Image
+                      source={{ uri: image }}
+                      style={[styles.previewCard, { width: previewLayout.cardWidth, height: previewLayout.cardHeight }]}
+                      resizeMode="cover"
+                    />
                   </View>
                 );
               })
             ) : (
-              <View style={[styles.previewCard, styles.placeholderCard]}>
+              <View
+                style={[
+                  styles.previewCard,
+                  styles.placeholderCard,
+                  { width: previewLayout.cardWidth, height: previewLayout.cardHeight }
+                ]}
+              >
                 <Text style={styles.placeholderText}>No inventory photos yet</Text>
                 <Text style={styles.placeholderHint}>Add dress photos in Inventory to power session previews.</Text>
               </View>
@@ -1179,8 +1227,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 29, fontWeight: '700', color: '#433A3F' },
   subtitle: { color: '#94888F', fontSize: 15 },
   previewStackWrap: {
-    width: 280,
-    height: 340,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -1190,8 +1236,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden'
   },
   previewCard: {
-    width: 210,
-    height: 300,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#EADDE2',
