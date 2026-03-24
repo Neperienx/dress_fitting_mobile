@@ -1179,8 +1179,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 29, fontWeight: '700', color: '#433A3F' },
   subtitle: { color: '#94888F', fontSize: 15 },
   previewStackWrap: {
-    width: 230,
-    height: 280,
+    width: 280,
+    height: 340,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -1190,8 +1190,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden'
   },
   previewCard: {
-    width: 170,
-    height: 240,
+    width: 210,
+    height: 300,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#EADDE2',
