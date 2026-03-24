@@ -89,14 +89,13 @@ Use the Supabase URL that your app runtime can reach:
 
 ### Bundled custom cursive font (long-term / reproducible setup)
 
-If you want a cursive typeface that behaves the same on all devices and builds:
+`expo-font` is now a direct dependency, so a plain `npm install` includes it automatically.
+A `postinstall` check also confirms that the app config keeps both `ios` and `android` enabled.
+
+If you want a fully custom cursive typeface that behaves the same on all devices and builds:
 
 1. Add a font file to source control (for example `Mobile_version/assets/fonts/GreatVibes-Regular.ttf`).
-2. Install and pin `expo-font` as a direct dependency:
-   ```bash
-   npm install expo-font
-   ```
-3. Load it at app startup:
+2. Load it at app startup:
    ```ts
    import { useFonts } from 'expo-font';
 
@@ -104,12 +103,12 @@ If you want a cursive typeface that behaves the same on all devices and builds:
      BrandCursive: require('../assets/fonts/GreatVibes-Regular.ttf')
    });
    ```
-4. Use the loaded family name in styles:
+3. Use the loaded family name in styles:
    ```ts
    fontFamily: 'BrandCursive'
    ```
 
-This approach is the most stable because the font is versioned in the repo and bundled with the app instead of relying on device defaults.
+This approach is the most stable because the font is versioned in the repo and bundled with the app instead of relying on device defaults, and it works on both iOS and Android.
 
 ## Session shortlist recap sharing
 
