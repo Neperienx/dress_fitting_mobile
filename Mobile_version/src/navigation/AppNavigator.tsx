@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, NavigatorScreenParams, RouteProp, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -178,7 +178,8 @@ function AppTabs() {
   const screenOptions = useMemo(
     () => ({
       headerTitle: () => <StoreHeaderTitle />,
-      headerRight: () => <AccountHeaderButton />
+      headerRight: () => <AccountHeaderButton />,
+      headerTitleAlign: 'center' as const
     }),
     []
   );
@@ -275,12 +276,18 @@ const headerStyles = StyleSheet.create({
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     maxWidth: 220
   },
   triggerText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '600',
+    fontFamily: Platform.select({
+      ios: 'SnellRoundhand-Bold',
+      android: 'cursive',
+      default: 'serif'
+    }),
     color: '#443C40',
     maxWidth: 185
   },
