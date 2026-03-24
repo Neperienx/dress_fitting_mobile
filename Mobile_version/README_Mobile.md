@@ -85,6 +85,31 @@ Use the Supabase URL that your app runtime can reach:
 - If inventory fails with `Could not find the table 'public.dresses' in the schema cache · code: PGRST205`, your DB is missing the inventory migration. From `Mobile_version/` run `npx supabase db push` (or `npx supabase db reset` for local), then reload the app.
 - If you see errors about `updated_at` missing, run `npx supabase db push` to apply migration `004_inventory_updated_at.sql`.
 - For physical devices, ensure phone and computer are on the same network and port `54321` is reachable.
+- If you see `fontFamily "cursive" is not a system font and has not been loaded through expo-font`, avoid generic CSS family names (`cursive`) in React Native styles. Use a known system family (`serif`, `sans-serif`, etc.) or bundle a real font file with `expo-font`.
+
+### Bundled custom cursive font (long-term / reproducible setup)
+
+If you want a cursive typeface that behaves the same on all devices and builds:
+
+1. Add a font file to source control (for example `Mobile_version/assets/fonts/GreatVibes-Regular.ttf`).
+2. Install and pin `expo-font` as a direct dependency:
+   ```bash
+   npm install expo-font
+   ```
+3. Load it at app startup:
+   ```ts
+   import { useFonts } from 'expo-font';
+
+   const [fontsLoaded] = useFonts({
+     BrandCursive: require('../assets/fonts/GreatVibes-Regular.ttf')
+   });
+   ```
+4. Use the loaded family name in styles:
+   ```ts
+   fontFamily: 'BrandCursive'
+   ```
+
+This approach is the most stable because the font is versioned in the repo and bundled with the app instead of relying on device defaults.
 
 ## Session shortlist recap sharing
 
