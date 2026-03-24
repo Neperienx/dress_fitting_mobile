@@ -155,6 +155,7 @@ export default function SessionScreen() {
   const [shareGenerating, setShareGenerating] = useState(false);
 
   const swipePosition = useRef(new Animated.ValueXY()).current;
+  const lastDressTapByIdRef = useRef<Record<string, number>>({});
 
   const loadInventoryDresses = useCallback(async () => {
     if (!selectedStore?.id || !session?.user.id) {
@@ -525,6 +526,19 @@ export default function SessionScreen() {
       previous.includes(dressId) ? previous.filter((id) => id !== dressId) : [...previous, dressId]
     );
   }, []);
+
+  const handleRankingDressPress = useCallback(
+    (dressId: string) => {
+      const now = Date.now();
+      const previousTap = lastDressTapByIdRef.current[dressId] ?? 0;
+      lastDressTapByIdRef.current[dressId] = now;
+
+      if (now - previousTap <= 280) {
+        toggleShortlist(dressId);
+      }
+    },
+    [toggleShortlist]
+  );
 
   const hasFeedbackComment = feedbackComment.trim().length > 0;
   const shouldShowFeedbackSection = showShortlistOnly && !feedbackSubmittedAt;
@@ -949,28 +963,44 @@ export default function SessionScreen() {
             const isShortlisted = activeSessionData.shortlistDressIds.includes(entry.dress.id);
 
             return (
-              <Pressable key={entry.dress.id} style={styles.rankingCard} onPress={() => setSelectedResultDressId(entry.dress.id)}>
-                {image ? <Image source={{ uri: image }} style={styles.rankingImage} /> : <View style={styles.rankingImage} />}
-                <View style={styles.rankingBody}>
+              <View key={entry.dress.id} style={styles.rankingFeedCard}>
+                <Pressable style={styles.rankingImageWrap} onPress={() => handleRankingDressPress(entry.dress.id)}>
+                  {image ? <Image source={{ uri: image }} style={styles.rankingFeedImage} /> : <View style={styles.rankingFeedImage} />}
+                  {dressImages.length > 0 ? (
+                    <View pointerEvents="none" style={styles.photoIndicatorRow}>
+                      {dressImages.map((_, dotIndex) => (
+                        <View
+                          key={`${entry.dress.id}-ranking-dot-${dotIndex}`}
+                          style={[styles.photoIndicatorDot, dotIndex === imageIndex && styles.photoIndicatorDotActive]}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                  {dressImages.length > 1 ? (
+                    <View style={styles.photoNavOverlay}>
+                      <Pressable
+                        style={styles.photoNavZone}
+                        onPress={() => changeDressPhoto(entry.dress.id, -1, activeSessionData.allStoreDresses)}
+                      />
+                      <Pressable
+                        style={styles.photoNavZone}
+                        onPress={() => changeDressPhoto(entry.dress.id, 1, activeSessionData.allStoreDresses)}
+                      />
+                    </View>
+                  ) : null}
+                </Pressable>
+                <View style={styles.rankingFeedMeta}>
                   <View style={styles.rankingHeader}>
-                    <Text style={styles.rankingName}>
-                      #{index + 1} {entry.dress.name || 'Untitled dress'}
-                    </Text>
-                    <Pressable
-                      hitSlop={10}
-                      onPress={(event) => {
-                        event.stopPropagation();
-                        toggleShortlist(entry.dress.id);
-                      }}
-                    >
+                    <Text style={styles.rankingName}>{index + 1}. {entry.dress.name || 'Untitled dress'}</Text>
+                    <Pressable hitSlop={10} onPress={() => toggleShortlist(entry.dress.id)}>
                       <Text style={[styles.shortlistStar, isShortlisted && styles.shortlistStarActive]}>★</Text>
                     </Pressable>
                   </View>
                   <Text style={styles.rankingScore}>Score: {entry.score}</Text>
-                  <Text style={styles.rankingHint}>Tap card to view and browse photos</Text>
+                  <Text style={styles.rankingHint}>Double tap image to shortlist</Text>
                   {decision ? <Text style={styles.decisionPill}>Session action: {decision}</Text> : null}
                 </View>
-              </Pressable>
+              </View>
             );
           })
         )}
@@ -1374,19 +1404,22 @@ const styles = StyleSheet.create({
   analyticsBarTrack: { flexDirection: 'row', height: 10, width: '100%', borderRadius: 5, overflow: 'hidden', backgroundColor: '#F3DCE3' },
   analyticsBarLike: { backgroundColor: '#2EAF64', height: '100%' },
   analyticsBarDislike: { backgroundColor: '#D94D4D', height: '100%' },
-  rankingCard: {
-    flexDirection: 'row',
-    gap: 12,
+  rankingFeedCard: {
     borderWidth: 1,
     borderColor: '#ECE2E7',
-    borderRadius: 12,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
-    padding: 10
+    overflow: 'hidden'
   },
-  rankingImage: { width: 72, height: 96, borderRadius: 8, backgroundColor: '#F1E8EB' },
-  rankingBody: { flex: 1, gap: 4 },
+  rankingImageWrap: {
+    width: '100%',
+    aspectRatio: 0.8,
+    backgroundColor: '#F1E8EB'
+  },
+  rankingFeedImage: { width: '100%', height: '100%', backgroundColor: '#F1E8EB' },
+  rankingFeedMeta: { paddingHorizontal: 12, paddingVertical: 10, gap: 4 },
   rankingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  rankingName: { color: '#54484E', fontWeight: '700' },
+  rankingName: { color: '#54484E', fontWeight: '700', flex: 1 },
   rankingScore: { color: '#807278', fontWeight: '600' },
   rankingHint: { color: '#9C8F95', fontSize: 12 },
   shortlistStar: { color: '#CBBFC4', fontSize: 24, lineHeight: 24 },
