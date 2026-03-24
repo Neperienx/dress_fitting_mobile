@@ -19,6 +19,7 @@ import { assertSupabaseConfigured, supabase } from '../lib/supabase';
 import { StoresStackParamList } from '../navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<StoresStackParamList, 'StoresList'>;
+const MAX_STORE_NAME_LENGTH = 40;
 
 export default function StoresScreen({ navigation }: Props) {
   const { session } = useAuth();
@@ -34,6 +35,10 @@ export default function StoresScreen({ navigation }: Props) {
 
     if (!trimmedName) {
       Alert.alert('Name required', 'Please enter a store name.');
+      return;
+    }
+    if (trimmedName.length > MAX_STORE_NAME_LENGTH) {
+      Alert.alert('Name too long', `Store names can be up to ${MAX_STORE_NAME_LENGTH} characters.`);
       return;
     }
 
@@ -124,6 +129,7 @@ export default function StoresScreen({ navigation }: Props) {
               value={storeName}
               onChangeText={setStoreName}
               autoCapitalize="words"
+              maxLength={MAX_STORE_NAME_LENGTH}
             />
             <TextInput
               style={styles.input}

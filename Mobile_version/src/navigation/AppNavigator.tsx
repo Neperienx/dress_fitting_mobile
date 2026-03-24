@@ -98,7 +98,7 @@ function StoreHeaderTitle() {
   return (
     <>
       <Pressable style={headerStyles.trigger} onPress={handleTitlePress}>
-        <Text numberOfLines={1} style={headerStyles.triggerText}>
+        <Text adjustsFontSizeToFit minimumFontScale={0.65} numberOfLines={1} style={headerStyles.triggerText}>
           {title}
         </Text>
         <Text style={headerStyles.triggerIcon}>{hasStores ? '▾' : '↗'}</Text>
@@ -278,18 +278,20 @@ const headerStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    maxWidth: 220
+    maxWidth: 290,
+    minWidth: 0
   },
   triggerText: {
     fontSize: 24,
-    fontWeight: '600',
     fontFamily: Platform.select({
       ios: 'SnellRoundhand-Bold',
-      android: 'serif',
+      android: 'cursive',
       default: 'serif'
     }),
     color: '#443C40',
-    maxWidth: 185
+    maxWidth: 255,
+    minWidth: 0,
+    flexShrink: 1
   },
   triggerIcon: {
     fontSize: 14,
