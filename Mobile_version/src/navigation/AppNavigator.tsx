@@ -285,7 +285,7 @@ const headerStyles = StyleSheet.create({
     fontSize: 24,
     fontFamily: Platform.select({
       ios: 'SnellRoundhand-Bold',
-      android: 'cursive',
+      android: 'serif',
       default: 'serif'
     }),
     color: '#443C40',
