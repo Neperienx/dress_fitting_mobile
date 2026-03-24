@@ -207,7 +207,11 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
 
         <View style={styles.sectionList}>
           {renderedSections.map((section) => (
-            <Pressable key={section.key} style={styles.sectionCard} onPress={() => handleSectionPress(section)}>
+            <Pressable
+              key={section.key}
+              style={[styles.sectionCard, section.key === 'sessions' && styles.sessionSectionCard]}
+              onPress={() => handleSectionPress(section)}
+            >
               <View style={styles.sectionTextWrap}>
                 <Text style={styles.sectionTitle}>{section.title}</Text>
                 <Text style={styles.sectionSubtitle}>{section.subtitle}</Text>
@@ -320,8 +324,9 @@ const styles = StyleSheet.create({
     borderColor: '#E6D9DF',
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    minHeight: 86,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -331,9 +336,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2
   },
+  sessionSectionCard: {
+    minHeight: 104,
+    borderColor: '#EAD2DA',
+    shadowOpacity: 0.12
+  },
   sectionTextWrap: { flex: 1, paddingRight: 10 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#433A3F' },
-  sectionSubtitle: { marginTop: 4, color: '#958A90' },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#433A3F' },
+  sectionSubtitle: { marginTop: 6, color: '#958A90', fontSize: 14 },
   chevron: { fontSize: 28, lineHeight: 28, color: '#A4959B' },
   overlayBackdrop: {
     flex: 1,
