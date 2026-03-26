@@ -124,7 +124,7 @@ function formatSessionDate(isoDate: string) {
 }
 
 export default function SessionScreen() {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const navigation = useNavigation<BottomTabNavigationProp<AppTabsParamList>>();
   const route = useRoute<{ params?: { open?: 'recent'; sessionId?: string; resetToStart?: boolean } }>();
   const { session } = useAuth();
@@ -268,11 +268,22 @@ export default function SessionScreen() {
     const contentHorizontalPadding = 40;
     const layerOffsetX = 12;
     const layerOffsetY = 6;
+    const cardAspectRatio = 1.32;
     const visibleLayers = Math.max(Math.min(previewImages.length, 3), 1);
     const stackDepth = visibleLayers - 1;
+
     const availableWidth = Math.max(windowWidth - contentHorizontalPadding, 250);
-    const cardWidth = Math.min(Math.max(availableWidth - stackDepth * layerOffsetX - 6, 220), 380);
-    const cardHeight = Math.round(cardWidth * 1.38);
+    let cardWidth = Math.min(Math.max(availableWidth - stackDepth * layerOffsetX - 6, 220), 380);
+    let cardHeight = Math.round(cardWidth * cardAspectRatio);
+
+    const reservedVerticalSpace = 360;
+    const maxWrapHeight = Math.max(windowHeight - reservedVerticalSpace, 280);
+    const maxCardHeight = maxWrapHeight - stackDepth * layerOffsetY - 8;
+
+    if (cardHeight > maxCardHeight) {
+      cardHeight = Math.round(maxCardHeight);
+      cardWidth = Math.max(Math.round(cardHeight / cardAspectRatio), 210);
+    }
 
     return {
       cardWidth,
@@ -282,7 +293,7 @@ export default function SessionScreen() {
       wrapWidth: cardWidth + stackDepth * layerOffsetX,
       wrapHeight: cardHeight + stackDepth * layerOffsetY + 8
     };
-  }, [previewImages.length, windowWidth]);
+  }, [previewImages.length, windowHeight, windowWidth]);
 
   const swipedCount = swipeIndex;
   const currentDress = sessionQueue[swipeIndex] ?? null;
