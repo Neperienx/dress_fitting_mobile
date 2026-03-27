@@ -17,6 +17,7 @@ import StoreDetailScreen from '../screens/StoreDetailScreen';
 import InventoryScreen from '../screens/InventoryScreen';
 import DressProfileScreen from '../screens/DressProfileScreen';
 import StoreRecentSessionsScreen from '../screens/StoreRecentSessionsScreen';
+import { StoreType } from '../types/store';
 
 type AuthStackParamList = {
   Login: undefined;
@@ -30,6 +31,7 @@ export type StoresStackParamList = {
     storeId: string;
     storeName: string;
     storeCity: string | null;
+    storeType: StoreType;
   };
   StoreRecentSessions: {
     storeId: string;
@@ -38,10 +40,12 @@ export type StoresStackParamList = {
   Inventory: {
     storeId: string;
     storeName: string;
+    storeType: StoreType;
   };
   DressProfile: {
     storeId: string;
     storeName: string;
+    storeType: StoreType;
     dress: {
       id: string;
       name: string | null;
@@ -221,7 +225,8 @@ function AppTabs() {
               params: {
                 storeId: selectedStore.id,
                 storeName: selectedStore.name,
-                storeCity: selectedStore.city
+                storeCity: selectedStore.city,
+                storeType: selectedStore.type
               }
             });
           }

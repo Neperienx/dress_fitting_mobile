@@ -25,7 +25,8 @@ import * as FileSystem from 'expo-file-system';
 
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { assertSupabaseConfigured, supabase } from '../lib/supabase';
+import { getTagCatalogByStoreType } from '../data/tagCatalogs';
+import { assertSupabaseConfiguredForStoreType, getSupabaseForStoreType } from '../lib/supabase';
 import { 
   SavedSession,
   SessionDress,
@@ -39,10 +40,6 @@ import {
 } from '../utils/sessionHistory';
 import { buildSessionRecapSvg, selectShareTopDresses } from '../utils/sessionShare';
 import { syncInventoryForStore } from '../utils/inventoryCache';
-
-const englishTagCatalog = require('../data/dress-tags.en.json') as {
-  categories?: Array<{ name: string; tags: string[] }>;
-};
 
 type SessionStage = 'landing' | 'swiping' | 'results';
 type ResultsTab = 'analytics' | 'ranking';
@@ -129,6 +126,7 @@ export default function SessionScreen() {
   const route = useRoute<{ params?: { open?: 'recent'; sessionId?: string; resetToStart?: boolean } }>();
   const { session } = useAuth();
   const { selectedStore } = useStore();
+  const tagCatalog = useMemo(() => getTagCatalogByStoreType(selectedStore?.type), [selectedStore?.type]);
 
   const [allStoreDresses, setAllStoreDresses] = useState<SessionDress[]>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -168,7 +166,10 @@ export default function SessionScreen() {
 
     setLoadingPreview(true);
     try {
-      const dresses = (await syncInventoryForStore({ storeId: selectedStore.id })) as SessionPreviewDress[];
+      const dresses = (await syncInventoryForStore({
+        storeId: selectedStore.id,
+        storeType: selectedStore.type
+      })) as SessionPreviewDress[];
       const keys = dresses.map((dress) => getTagStorageKey(dress.id));
       const storedTags = keys.length > 0 ? await AsyncStorage.multiGet(keys) : [];
       const tagsByKey = new Map(storedTags);
@@ -201,7 +202,7 @@ export default function SessionScreen() {
     } finally {
       setLoadingPreview(false);
     }
-  }, [selectedStore?.id, session?.user.id]);
+  }, [selectedStore?.id, selectedStore?.type, session?.user.id]);
 
   useEffect(() => {
     void loadInventoryDresses();
@@ -629,9 +630,10 @@ export default function SessionScreen() {
 
     try {
       setFeedbackSubmitting(true);
-      assertSupabaseConfigured();
+      assertSupabaseConfiguredForStoreType(selectedStore.type);
+      const scopedSupabase = getSupabaseForStoreType(selectedStore.type);
 
-      const { error } = await supabase.from('session_feedback').upsert(
+      const { error } = await scopedSupabase.from('session_feedback').upsert(
         {
           studio_id: selectedStore.id,
           submitted_by: session.user.id,
@@ -675,6 +677,7 @@ export default function SessionScreen() {
     persistSessionFeedbackLocally,
     savedSessionId,
     selectedStore?.id,
+    selectedStore?.type,
     session?.user.id
   ]);
 
@@ -765,7 +768,7 @@ export default function SessionScreen() {
 
   const tagsByCategory = useMemo(() => {
     const categoryByTag = new Map<string, string>();
-    (englishTagCatalog.categories ?? []).forEach((category) => {
+    tagCatalog.categories.forEach((category) => {
       category.tags.forEach((tag) => {
         categoryByTag.set(tag, category.name);
       });
@@ -780,7 +783,7 @@ export default function SessionScreen() {
     });
 
     return Array.from(grouped.entries()).map(([category, tags]) => ({ category, tags }));
-  }, [rankedTags]);
+  }, [rankedTags, tagCatalog.categories]);
 
   const renderLanding = () => (
     <ScrollView contentContainerStyle={styles.content}>

@@ -12,6 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { getTagCatalogByStoreType } from '../data/tagCatalogs';
 import { StoresStackParamList } from '../navigation/AppNavigator';
 
 type TagCategory = {
@@ -19,23 +20,15 @@ type TagCategory = {
   tags: string[];
 };
 
-const englishTagCatalog = require('../data/dress-tags.en.json') as {
-  language: string;
-  categories?: TagCategory[];
-  tags?: string[];
-};
-
 type Props = NativeStackScreenProps<StoresStackParamList, 'DressProfile'>;
-
-const categorizedTagCatalog: TagCategory[] =
-  englishTagCatalog.categories ?? [{ name: 'Tags', tags: englishTagCatalog.tags ?? [] }];
 
 function getTagStorageKey(dressId: string) {
   return `dress-tags:${dressId}`;
 }
 
 export default function DressProfileScreen({ route }: Props) {
-  const { dress } = route.params;
+  const { dress, storeType } = route.params;
+  const tagCatalog = getTagCatalogByStoreType(storeType) as { language: string; categories: TagCategory[] };
   const photos = dress.dress_images;
   const [photoIndex, setPhotoIndex] = useState(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -145,13 +138,13 @@ export default function DressProfileScreen({ route }: Props) {
         <View style={styles.modalBackdrop}>
           <Pressable style={styles.dismissArea} onPress={() => setShowTagManager(false)} />
           <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>Manage tags ({englishTagCatalog.language})</Text>
+            <Text style={styles.sheetTitle}>Manage tags ({tagCatalog.language})</Text>
             <View style={styles.previewRow}>
               {activePhoto ? <Image source={{ uri: activePhoto }} style={styles.miniPreview} /> : <View style={styles.miniPreview} />}
               <Text style={styles.previewName}>{dress.name || 'Untitled dress'}</Text>
             </View>
             <ScrollView contentContainerStyle={styles.categoriesWrap}>
-              {categorizedTagCatalog.map((category) => (
+              {tagCatalog.categories.map((category) => (
                 <View key={category.name} style={styles.categorySection}>
                   <Text style={styles.categoryTitle}>{category.name}</Text>
                   <View style={styles.tagsGrid}>

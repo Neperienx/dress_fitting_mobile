@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 import { useAuth } from './AuthContext';
 import { assertSupabaseConfigured, supabase } from '../lib/supabase';
+import { defaultStoreType, StoreType } from '../types/store';
 
 const SELECTED_STORE_KEY_PREFIX = 'selected-store-id';
 
@@ -10,6 +11,7 @@ export type Store = {
   id: string;
   name: string;
   city: string | null;
+  type: StoreType;
 };
 
 type StoreContextValue = {
@@ -62,7 +64,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       assertSupabaseConfigured();
       const { data, error } = await supabase
         .from('studios')
-        .select('id, name, city')
+        .select('id, name, city, type')
         .eq('owner_id', session.user.id)
         .order('created_at', { ascending: true });
 
@@ -70,7 +72,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
 
-      const nextStores = data ?? [];
+      const nextStores = ((data ?? []) as Array<{ id: string; name: string; city: string | null; type: string | null }>).map((store) => ({
+        ...store,
+        type: store.type === 'engagement_rings' ? 'engagement_rings' : defaultStoreType
+      }));
       setStores(nextStores);
       await applySelection(nextStores, session.user.id);
     } catch (error) {

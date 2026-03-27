@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { assertSupabaseConfigured, supabase } from '../lib/supabase';
+import { assertSupabaseConfiguredForStoreType, getSupabaseForStoreType } from '../lib/supabase';
 import { syncInventoryForStore } from '../utils/inventoryCache';
 import { StoresStackParamList } from '../navigation/AppNavigator';
 
@@ -160,7 +160,7 @@ function loadDocumentPickerModule(): MaybeDocumentPickerModule | null {
 
 export default function InventoryScreen({ route, navigation }: Props) {
   const { session } = useAuth();
-  const { storeId, storeName } = route.params;
+  const { storeId, storeName, storeType } = route.params;
 
   const [dresses, setDresses] = useState<Dress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,7 +174,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
   const loadDresses = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await syncInventoryForStore({ storeId });
+      const data = await syncInventoryForStore({ storeId, storeType });
       setDresses(data as Dress[]);
     } catch (error) {
       if (isMissingInventorySchemaError(error)) {
@@ -186,7 +186,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, storeType]);
 
   React.useEffect(() => {
     void loadDresses();
@@ -312,10 +312,11 @@ export default function InventoryScreen({ route, navigation }: Props) {
     }
 
     try {
-      assertSupabaseConfigured();
+      assertSupabaseConfiguredForStoreType(storeType);
+      const scopedSupabase = getSupabaseForStoreType(storeType);
       setSavingDress(true);
 
-      const { data: insertedDress, error: dressError } = await supabase
+      const { data: insertedDress, error: dressError } = await scopedSupabase
         .from('dresses')
         .insert({
           studio_id: storeId,
@@ -336,7 +337,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
         sort_order: index
       }));
 
-      const { error: imagesError } = await supabase.from('dress_images').insert(imageRows);
+      const { error: imagesError } = await scopedSupabase.from('dress_images').insert(imageRows);
       if (imagesError) {
         throw imagesError;
       }
@@ -369,7 +370,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
     } finally {
       setSavingDress(false);
     }
-  }, [dressName, loadDresses, photoUrls, priceText, resetForm, session?.user.id, storeId]);
+  }, [dressName, loadDresses, photoUrls, priceText, resetForm, session?.user.id, storeId, storeType]);
 
   const dressTiles = useMemo(
     () =>
@@ -380,7 +381,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
           <Pressable
             key={dress.id}
             style={styles.dressTile}
-            onPress={() => navigation.navigate('DressProfile', { storeId, storeName, dress })}
+            onPress={() => navigation.navigate('DressProfile', { storeId, storeName, storeType, dress })}
           >
             {leadImage ? (
               <Image source={{ uri: leadImage }} style={styles.dressImage} resizeMode="cover" />

@@ -2,12 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { getTagCatalogByStoreType } from '../data/tagCatalogs';
 import { StoresStackParamList } from '../navigation/AppNavigator';
 import { SavedSession, loadSessionHistory } from '../utils/sessionHistory';
-
-const englishTagCatalog = require('../data/dress-tags.en.json') as {
-  categories?: Array<{ name: string; tags: string[] }>;
-};
 
 type Props = NativeStackScreenProps<StoresStackParamList, 'StoreDetail'>;
 
@@ -18,6 +15,7 @@ type MenuSection = {
 };
 
 type InsightsTab = 'overview' | 'analytics';
+type BestDress = { id: string; score: number; name: string | null; tags: string[] };
 
 const sections: MenuSection[] = [
   {
@@ -38,7 +36,7 @@ const sections: MenuSection[] = [
 ];
 
 export default function StoreDetailScreen({ navigation, route }: Props) {
-  const { storeId, storeName, storeCity } = route.params;
+  const { storeId, storeName, storeCity, storeType } = route.params;
   const [searchValue, setSearchValue] = useState('');
   const [activeOverlay, setActiveOverlay] = useState<MenuSection | null>(null);
   const [recentSessions, setRecentSessions] = useState<SavedSession[]>([]);
@@ -83,7 +81,7 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
     }
 
     if (section.key === 'inventory') {
-      navigation.navigate('Inventory', { storeId, storeName });
+      navigation.navigate('Inventory', { storeId, storeName, storeType });
       return;
     }
 
@@ -113,7 +111,7 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
     [recentSessions]
   );
 
-  const bestDress = useMemo(() => {
+  const bestDress = useMemo<BestDress | null>(() => {
     const scoreByDress = recentSessions.reduce<Record<string, number>>((scores, session) => {
       Object.entries(session.dressDecisions ?? {}).forEach(([dressId, decision]) => {
         const weight = decision === 'superlike' ? 2 : decision === 'like' ? 1 : -1;
@@ -122,7 +120,7 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
       return scores;
     }, {});
 
-    let best: { id: string; score: number; name: string | null; tags: string[] } | null = null;
+    let best: BestDress | null = null;
 
     recentSessions.forEach((session) => {
       session.allStoreDresses?.forEach((dress) => {
@@ -141,8 +139,9 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
   }, [recentSessions]);
 
   const accessoryInsights = useMemo(() => {
+    const tagCatalog = getTagCatalogByStoreType(storeType);
     const accessoryTags = new Set(
-      (englishTagCatalog.categories ?? []).find((category) => category.name === 'Accessories')?.tags ?? []
+      tagCatalog.categories.find((category) => category.name === 'Accessories')?.tags ?? []
     );
 
     const pairings = new Map<string, Map<string, number>>();
@@ -189,7 +188,7 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
       .filter((entry) => entry.accessory)
       .sort((a, b) => b.count - a.count)
       .slice(0, 6);
-  }, [recentSessions]);
+  }, [recentSessions, storeType]);
 
   return (
     <SafeAreaView style={styles.container}>
