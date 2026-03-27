@@ -17,9 +17,14 @@ import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { assertSupabaseConfigured, supabase } from '../lib/supabase';
 import { StoresStackParamList } from '../navigation/AppNavigator';
+import { defaultStoreType, getStoreTypeLabel, StoreType } from '../types/store';
 
 type Props = NativeStackScreenProps<StoresStackParamList, 'StoresList'>;
 const MAX_STORE_NAME_LENGTH = 40;
+const STORE_TYPES = [
+  { value: 'wedding_dresses' as const, label: 'Wedding Dresses' },
+  { value: 'engagement_rings' as const, label: 'Engagement Rings' }
+];
 
 export default function StoresScreen({ navigation }: Props) {
   const { session } = useAuth();
@@ -27,6 +32,7 @@ export default function StoresScreen({ navigation }: Props) {
   const [showCreateStoreModal, setShowCreateStoreModal] = useState(false);
   const [storeName, setStoreName] = useState('');
   const [storeLocation, setStoreLocation] = useState('');
+  const [storeType, setStoreType] = useState<StoreType>(defaultStoreType);
   const [savingStore, setSavingStore] = useState(false);
 
   const createStore = useCallback(async () => {
@@ -53,7 +59,8 @@ export default function StoresScreen({ navigation }: Props) {
       const { error } = await supabase.from('studios').insert({
         owner_id: session.user.id,
         name: trimmedName,
-        city: trimmedLocation || null
+        city: trimmedLocation || null,
+        type: storeType
       });
 
       if (error) {
@@ -62,6 +69,7 @@ export default function StoresScreen({ navigation }: Props) {
 
       setStoreName('');
       setStoreLocation('');
+      setStoreType(defaultStoreType);
       setShowCreateStoreModal(false);
       await refreshStores();
     } catch (error) {
@@ -69,7 +77,7 @@ export default function StoresScreen({ navigation }: Props) {
     } finally {
       setSavingStore(false);
     }
-  }, [refreshStores, session?.user.id, storeLocation, storeName]);
+  }, [refreshStores, session?.user.id, storeLocation, storeName, storeType]);
 
   const storeTiles = useMemo(
     () =>
@@ -82,7 +90,8 @@ export default function StoresScreen({ navigation }: Props) {
             navigation.navigate('StoreDetail', {
               storeId: store.id,
               storeName: store.name,
-              storeCity: store.city
+              storeCity: store.city,
+              storeType: store.type
             });
           }}
         >
@@ -92,6 +101,9 @@ export default function StoresScreen({ navigation }: Props) {
           </Text>
           <Text numberOfLines={1} style={styles.storeLocation}>
             {store.city || 'Location not set'}
+          </Text>
+          <Text numberOfLines={1} style={styles.storeTypePill}>
+            {getStoreTypeLabel(store.type)}
           </Text>
         </Pressable>
       )),
@@ -138,6 +150,23 @@ export default function StoresScreen({ navigation }: Props) {
               onChangeText={setStoreLocation}
               autoCapitalize="words"
             />
+            <View style={styles.typePickerWrap}>
+              <Text style={styles.typePickerLabel}>Store type</Text>
+              <View style={styles.typeOptions}>
+                {STORE_TYPES.map((option) => {
+                  const isSelected = option.value === storeType;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      style={[styles.typeOption, isSelected && styles.typeOptionSelected]}
+                      onPress={() => setStoreType(option.value)}
+                    >
+                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>{option.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
             <View style={styles.modalActions}>
               <Pressable style={[styles.actionButton, styles.cancelButton]} onPress={() => setShowCreateStoreModal(false)}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -180,6 +209,16 @@ const styles = StyleSheet.create({
   storeIcon: { fontSize: 38, color: '#b3afc2' },
   storeName: { fontSize: 16, fontWeight: '600', color: '#2E2A2B' },
   storeLocation: { color: '#746f86' },
+  storeTypePill: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    backgroundColor: '#F2EEF9',
+    color: '#5A4B79',
+    fontSize: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -201,6 +240,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: '#faf9ff'
   },
+  typePickerWrap: { gap: 8 },
+  typePickerLabel: { color: '#4E4760', fontWeight: '600' },
+  typeOptions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  typeOption: {
+    borderWidth: 1,
+    borderColor: '#d4d0e2',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#faf9ff'
+  },
+  typeOptionSelected: {
+    borderColor: '#787194',
+    backgroundColor: '#ece9f7'
+  },
+  typeOptionText: { color: '#5c556f', fontWeight: '600' },
+  typeOptionTextSelected: { color: '#2f2a3e' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 6 },
   actionButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
   cancelButton: { backgroundColor: '#eceaf4' },

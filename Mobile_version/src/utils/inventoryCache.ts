@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'react-native';
 
-import { assertSupabaseConfigured, supabase } from '../lib/supabase';
+import { assertSupabaseConfiguredForStoreType, getSupabaseForStoreType } from '../lib/supabase';
+import { StoreType } from '../types/store';
 
 export type InventoryDressImage = {
   id: string;
@@ -26,6 +27,7 @@ type CachedInventorySnapshot = {
 
 type SyncInventoryOptions = {
   storeId: string;
+  storeType: StoreType;
   maxCacheAgeMs?: number;
 };
 
@@ -86,9 +88,10 @@ async function writeCachedInventory(storeId: string, dresses: InventoryDress[]) 
   await AsyncStorage.setItem(getInventoryCacheKey(storeId), JSON.stringify(payload));
 }
 
-async function fetchFullInventory(storeId: string) {
-  assertSupabaseConfigured();
-  const { data, error } = await supabase
+async function fetchFullInventory(storeId: string, storeType: StoreType) {
+  assertSupabaseConfiguredForStoreType(storeType);
+  const scopedSupabase = getSupabaseForStoreType(storeType);
+  const { data, error } = await scopedSupabase
     .from('dresses')
     .select('id, name, price, created_at, dress_images(id, image_url, sort_order, created_at)')
     .eq('studio_id', storeId)
@@ -101,10 +104,11 @@ async function fetchFullInventory(storeId: string) {
   return normalizeDresses((data ?? []) as InventoryDress[]);
 }
 
-async function fetchInventoryRevision(storeId: string) {
-  assertSupabaseConfigured();
+async function fetchInventoryRevision(storeId: string, storeType: StoreType) {
+  assertSupabaseConfiguredForStoreType(storeType);
+  const scopedSupabase = getSupabaseForStoreType(storeType);
 
-  const { data: dresses, error: dressesError } = await supabase
+  const { data: dresses, error: dressesError } = await scopedSupabase
     .from('dresses')
     .select('id, created_at')
     .eq('studio_id', storeId)
@@ -114,7 +118,7 @@ async function fetchInventoryRevision(storeId: string) {
     throw dressesError;
   }
 
-  const { data: dressImages, error: imagesError } = await supabase
+  const { data: dressImages, error: imagesError } = await scopedSupabase
     .from('dress_images')
     .select('id, sort_order, created_at, dress_id, dresses!inner(studio_id)')
     .eq('dresses.studio_id', storeId)
@@ -164,7 +168,7 @@ function prefetchInventoryImages(dresses: InventoryDress[]) {
   });
 }
 
-export async function syncInventoryForStore({ storeId, maxCacheAgeMs = 1000 * 60 * 30 }: SyncInventoryOptions) {
+export async function syncInventoryForStore({ storeId, storeType, maxCacheAgeMs = 1000 * 60 * 30 }: SyncInventoryOptions) {
   const cached = await readCachedInventory(storeId);
 
   if (cached) {
@@ -179,18 +183,18 @@ export async function syncInventoryForStore({ storeId, maxCacheAgeMs = 1000 * 60
 
   try {
     if (!cached) {
-      const dresses = await fetchFullInventory(storeId);
+      const dresses = await fetchFullInventory(storeId, storeType);
       await writeCachedInventory(storeId, dresses);
       prefetchInventoryImages(dresses);
       return dresses;
     }
 
-    const remoteRevision = await fetchInventoryRevision(storeId);
+    const remoteRevision = await fetchInventoryRevision(storeId, storeType);
     if (remoteRevision === cached.revision) {
       return cached.dresses;
     }
 
-    const freshDresses = await fetchFullInventory(storeId);
+    const freshDresses = await fetchFullInventory(storeId, storeType);
     await writeCachedInventory(storeId, freshDresses);
     prefetchInventoryImages(freshDresses);
     return freshDresses;

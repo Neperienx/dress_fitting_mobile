@@ -1,0 +1,60 @@
+{
+  "language": "English",
+  "categories": [
+    {
+      "name": "Diamond Shape",
+      "key": "diamond_shape",
+      "tags": ["Round Brilliant", "Princess", "Oval", "Cushion", "Emerald", "Radiant", "Asscher", "Pear", "Marquise", "Heart"]
+    },
+    {
+      "name": "Center Stone Carat Range",
+      "key": "center_stone_carat_range",
+      "tags": ["<0.5 ct", "0.5–0.75 ct", "0.75–1.0 ct", "1.0–1.5 ct", "1.5–2.0 ct", "2.0–3.0 ct", "3.0+ ct"]
+    },
+    {
+      "name": "Setting Style",
+      "key": "setting_style",
+      "tags": ["Solitaire", "Halo", "Hidden Halo", "Double Halo", "Three Stone", "Side Stones", "Cluster", "Cathedral", "Bezel", "Tension", "Pavé Band", "Channel Set"]
+    },
+    {
+      "name": "Metal Type",
+      "key": "metal_type",
+      "tags": ["Yellow Gold", "White Gold", "Rose Gold", "Platinum", "Mixed Metal"]
+    },
+    {
+      "name": "Band Width",
+      "key": "band_width",
+      "tags": ["Very Thin (1–1.5mm)", "Thin (1.5–2mm)", "Medium (2–3mm)", "Thick (3mm+)"]
+    },
+    {
+      "name": "Center Stone Type",
+      "key": "center_stone_type",
+      "tags": ["Natural Diamond", "Lab Diamond", "Moissanite", "Sapphire", "Emerald", "Ruby", "Other Gemstone"]
+    },
+    {
+      "name": "Style",
+      "key": "style",
+      "tags": ["Classic", "Minimalist", "Vintage", "Art Deco", "Modern", "Bold", "Delicate", "Ornate"]
+    },
+    {
+      "name": "Side Stone Style",
+      "key": "side_stone_style",
+      "tags": ["None", "Pavé", "Channel", "Baguettes", "Trapezoids", "Tapered Diamonds", "Mixed stones"]
+    },
+    {
+      "name": "Setting Height",
+      "key": "setting_height",
+      "tags": ["Low profile", "Medium", "High profile"]
+    },
+    {
+      "name": "Design Features",
+      "key": "design_features",
+      "tags": ["Hidden Halo", "Split Shank", "Twisted Band", "Knife Edge", "Milgrain", "Filigree", "Double Band", "Floating Diamond"]
+    },
+    {
+      "name": "Visual Presence",
+      "key": "visual_presence",
+      "tags": ["Minimal", "Balanced", "Statement"]
+    }
+  ]
+}

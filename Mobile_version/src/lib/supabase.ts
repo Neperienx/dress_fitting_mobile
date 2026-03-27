@@ -1,9 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
+import { StoreType } from '../types/store';
 
 const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const rawRingSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL_ENGAGEMENT_RINGS;
+const ringSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY_ENGAGEMENT_RINGS;
 
 function normalizeSupabaseUrl(url?: string) {
   if (!url) {
@@ -25,11 +28,16 @@ function normalizeSupabaseUrl(url?: string) {
 }
 
 const supabaseUrl = normalizeSupabaseUrl(rawSupabaseUrl);
+const ringSupabaseUrl = normalizeSupabaseUrl(rawRingSupabaseUrl);
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isRingSupabaseConfigured = Boolean(ringSupabaseUrl && ringSupabaseAnonKey);
 
 export const missingSupabaseEnvMessage =
   'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to Mobile_version/.env, then restart Expo.';
+
+export const missingRingSupabaseEnvMessage =
+  'Engagement ring Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL_ENGAGEMENT_RINGS and EXPO_PUBLIC_SUPABASE_ANON_KEY_ENGAGEMENT_RINGS to Mobile_version/.env, then restart Expo.';
 
 if (!isSupabaseConfigured) {
   // eslint-disable-next-line no-console
@@ -49,6 +57,14 @@ export function assertSupabaseConfigured() {
   }
 }
 
+export function assertSupabaseConfiguredForStoreType(storeType: StoreType) {
+  if (storeType === 'engagement_rings' && !isRingSupabaseConfigured) {
+    throw new Error(missingRingSupabaseEnvMessage);
+  }
+
+  assertSupabaseConfigured();
+}
+
 const fallbackSupabaseUrl = 'https://placeholder.supabase.co';
 const fallbackSupabaseAnonKey = 'placeholder-anon-key';
 
@@ -64,3 +80,24 @@ export const supabase = createClient(
     }
   }
 );
+
+const ringSupabase = createClient(
+  ringSupabaseUrl ?? supabaseUrl ?? fallbackSupabaseUrl,
+  ringSupabaseAnonKey ?? supabaseAnonKey ?? fallbackSupabaseAnonKey,
+  {
+    auth: {
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false
+    }
+  }
+);
+
+export function getSupabaseForStoreType(storeType: StoreType) {
+  if (storeType === 'engagement_rings' && isRingSupabaseConfigured) {
+    return ringSupabase;
+  }
+
+  return supabase;
+}
