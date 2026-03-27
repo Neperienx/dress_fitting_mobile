@@ -91,6 +91,10 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
     setActiveOverlay(section);
   };
 
+  const handleBackToStoreSelection = () => {
+    navigation.navigate('StoresList');
+  };
+
   const overallTagRows = useMemo(
     () =>
       Object.entries(
@@ -193,7 +197,18 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.storeName}>{storeName}</Text>
+        <View style={styles.storeNameRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to store selection"
+            hitSlop={10}
+            onPress={handleBackToStoreSelection}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>‹</Text>
+          </Pressable>
+          <Text style={styles.storeName}>{storeName}</Text>
+        </View>
         <Text style={styles.storeCity}>{storeCity || 'Location not set'}</Text>
 
         <TextInput
@@ -305,6 +320,18 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5EFF3' },
   content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28, gap: 16 },
+  storeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  backButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: '#E6D9DF',
+    backgroundColor: '#FFFCFD',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  backButtonText: { fontSize: 28, lineHeight: 29, color: '#6E6167', marginTop: -3 },
   storeName: { fontSize: 28, fontWeight: '700', color: '#433A3F' },
   storeCity: { color: '#8B7E83', marginTop: -4 },
   searchInput: {
