@@ -13,6 +13,7 @@ import {
   TextInput,
   View
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '../context/AuthContext';
 import { assertSupabaseConfiguredForStoreType, getSupabaseForStoreType } from '../lib/supabase';
@@ -48,6 +49,7 @@ type MaybeImagePickerModule = {
   launchImageLibraryAsync: (options: {
     mediaTypes: string[];
     allowsMultipleSelection: boolean;
+    selectionLimit?: number;
     quality: number;
     base64?: boolean;
   }) => Promise<{ canceled: boolean; assets: PickerAsset[] }>;
@@ -172,6 +174,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
   const [optimizedPhotoCount, setOptimizedPhotoCount] = useState(0);
   const [savingDress, setSavingDress] = useState(false);
   const [deletingDressId, setDeletingDressId] = useState<string | null>(null);
+  const [tagCountByDressId, setTagCountByDressId] = useState<Record<string, number>>({});
 
   const inventorySchema = useMemo(() => getInventorySchemaConfig(storeType), [storeType]);
 
@@ -195,6 +198,54 @@ export default function InventoryScreen({ route, navigation }: Props) {
   React.useEffect(() => {
     void loadDresses();
   }, [loadDresses]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const loadTagCounts = async () => {
+      if (dresses.length === 0) {
+        if (isMounted) {
+          setTagCountByDressId({});
+        }
+        return;
+      }
+
+      const keys = dresses.map((dress) => `dress-tags:${dress.id}`);
+      const entries = await AsyncStorage.multiGet(keys);
+      if (!isMounted) {
+        return;
+      }
+
+      const nextTagCountByDressId: Record<string, number> = {};
+      entries.forEach(([key, value]) => {
+        const dressId = key.replace('dress-tags:', '');
+        if (!value) {
+          nextTagCountByDressId[dressId] = 0;
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            nextTagCountByDressId[dressId] = parsed.filter((entry): entry is string => typeof entry === 'string').length;
+            return;
+          }
+        } catch {
+          // Ignore malformed local tag payloads for this row.
+        }
+
+        nextTagCountByDressId[dressId] = 0;
+      });
+
+      setTagCountByDressId(nextTagCountByDressId);
+    };
+
+    void loadTagCounts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dresses]);
 
   const resetForm = useCallback(() => {
     setDressName('');
@@ -248,6 +299,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
     const result = await imagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
+      selectionLimit: 0,
       quality: inventoryUploadQuality,
       base64: true
     });
@@ -435,6 +487,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
     () =>
       dresses.map((dress) => {
         const leadImage = dress.dress_images[0]?.image_url;
+        const tagCount = tagCountByDressId[dress.id] ?? 0;
         const isDeleting = deletingDressId === dress.id;
 
         return (
@@ -452,22 +505,41 @@ export default function InventoryScreen({ route, navigation }: Props) {
               style={styles.dressTileContent}
             >
               {leadImage ? (
-                <Image source={{ uri: leadImage }} style={styles.dressImage} resizeMode="cover" />
+                <View style={styles.imageWrap}>
+                  <Image source={{ uri: leadImage }} style={styles.dressImage} resizeMode="cover" />
+                  <View style={styles.inventoryOverlayRow}>
+                    <View style={styles.metaPill}>
+                      <Text style={styles.metaPillText}>{dress.dress_images.length} photo(s)</Text>
+                    </View>
+                    <View style={styles.metaPill}>
+                      <Text style={styles.metaPillText}>{tagCount} tag(s)</Text>
+                    </View>
+                  </View>
+                </View>
               ) : (
-                <View style={[styles.dressImage, styles.imagePlaceholder]}>
-                  <Text style={styles.imagePlaceholderText}>No image</Text>
+                <View style={styles.imageWrap}>
+                  <View style={[styles.dressImage, styles.imagePlaceholder]}>
+                    <Text style={styles.imagePlaceholderText}>No image</Text>
+                  </View>
+                  <View style={styles.inventoryOverlayRow}>
+                    <View style={styles.metaPill}>
+                      <Text style={styles.metaPillText}>{dress.dress_images.length} photo(s)</Text>
+                    </View>
+                    <View style={styles.metaPill}>
+                      <Text style={styles.metaPillText}>{tagCount} tag(s)</Text>
+                    </View>
+                  </View>
                 </View>
               )}
               <Text numberOfLines={2} style={styles.dressName}>
                 {dress.name || `Untitled ${inventorySchema.titleSingular}`}
               </Text>
               <Text style={styles.dressMeta}>{dress.price ? `$${dress.price.toFixed(2)}` : 'No price'}</Text>
-              <Text style={styles.dressMeta}>{dress.dress_images.length} photo(s)</Text>
             </Pressable>
           </View>
         );
       }),
-    [confirmDeleteDress, deletingDressId, dresses, inventorySchema.titleSingular, navigation, storeId, storeName, storeType]
+    [confirmDeleteDress, deletingDressId, dresses, inventorySchema.titleSingular, navigation, storeId, storeName, storeType, tagCountByDressId]
   );
 
   return (
@@ -512,7 +584,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
 
             <Text style={styles.photoSectionLabel}>Photos (at least one required)</Text>
             <Text style={styles.photoSectionHint}>
-              Choose images from your gallery or files. Gallery picks are compressed to keep storage usage lower while preserving good quality.
+              Choose images from your gallery or files. You can select multiple photos in one pick. Gallery picks are compressed to keep storage usage lower while preserving good quality.
             </Text>
             <View style={styles.photoButtonRow}>
               <Pressable style={[styles.photoPickerButton, styles.filesButton]} onPress={() => void pickFromFiles()}>
@@ -596,7 +668,24 @@ const styles = StyleSheet.create({
   addTile: { alignItems: 'center', justifyContent: 'center', gap: 8 },
   addIcon: { fontSize: 38, color: '#9d99ac' },
   addLabel: { color: '#6B6467', fontWeight: '600' },
+  imageWrap: { position: 'relative' },
   dressImage: { width: '100%', height: 88, borderRadius: 8, backgroundColor: '#e9e6f3' },
+  inventoryOverlayRow: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    bottom: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6
+  },
+  metaPill: {
+    backgroundColor: 'rgba(41, 36, 56, 0.7)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3
+  },
+  metaPillText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
   imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   imagePlaceholderText: { color: '#7e7892' },
   dressName: { fontSize: 15, fontWeight: '600', color: '#2E2A2B' },
