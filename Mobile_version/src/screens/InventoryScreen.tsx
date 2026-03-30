@@ -174,10 +174,10 @@ export default function InventoryScreen({ route, navigation }: Props) {
 
   const inventorySchema = useMemo(() => getInventorySchemaConfig(storeType), [storeType]);
 
-  const loadDresses = useCallback(async () => {
+  const loadDresses = useCallback(async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const data = await syncInventoryForStore({ storeId, storeType });
+      const data = await syncInventoryForStore({ storeId, storeType, forceRefresh });
       setDresses(data as Dress[]);
     } catch (error) {
       if (isMissingInventorySchemaError(error, [inventorySchema.itemTable, inventorySchema.imageTable])) {
@@ -347,7 +347,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
 
       setShowCreateDressModal(false);
       resetForm();
-      await loadDresses();
+      await loadDresses(true);
     } catch (error) {
       if (isMissingInventorySchemaError(error, [inventorySchema.itemTable, inventorySchema.imageTable])) {
         Alert.alert(`Could not save ${inventorySchema.titleSingular}`, getInventorySchemaMissingMessage(inventorySchema.titlePlural));
