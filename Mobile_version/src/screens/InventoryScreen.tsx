@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { assertSupabaseConfiguredForStoreType, getSupabaseForStoreType } from '../lib/supabase';
 import { syncInventoryForStore } from '../utils/inventoryCache';
+import { getInventorySchemaConfig } from '../utils/inventoryTables';
 import { StoresStackParamList } from '../navigation/AppNavigator';
 
 type DressImage = {
@@ -116,7 +117,7 @@ function getErrorMessage(error: unknown) {
   return 'Unknown error';
 }
 
-function isMissingInventorySchemaError(error: unknown) {
+function isMissingInventorySchemaError(error: unknown, missingTables: string[]) {
   if (!error || typeof error !== 'object') {
     return false;
   }
@@ -124,7 +125,7 @@ function isMissingInventorySchemaError(error: unknown) {
   const code = 'code' in error && typeof error.code === 'string' ? error.code : null;
   const message = 'message' in error && typeof error.message === 'string' ? error.message.toLowerCase() : '';
 
-  return code === 'PGRST205' && (message.includes('public.dresses') || message.includes('public.dress_images'));
+  return code === 'PGRST205' && missingTables.some((table) => message.includes(`public.${table}`));
 }
 
 function isInventoryRlsError(error: unknown) {
@@ -138,8 +139,8 @@ function isInventoryRlsError(error: unknown) {
   return code === '42501' && message.includes('row-level security policy');
 }
 
-function getInventorySchemaMissingMessage() {
-  return 'Inventory tables are missing in your Supabase project. Run `npx supabase db push` (or `npx supabase db reset` for local dev) from `Mobile_version/`, then reload the app.';
+function getInventorySchemaMissingMessage(itemLabelPlural: string) {
+  return `Inventory tables for ${itemLabelPlural} are missing in your Supabase project. Run \`npx supabase db push\` (or \`npx supabase db reset\` for local dev) from \`Mobile_version/\`, then reload the app.`;
 }
 
 function loadImagePickerModule(): MaybeImagePickerModule | null {
@@ -171,14 +172,16 @@ export default function InventoryScreen({ route, navigation }: Props) {
   const [optimizedPhotoCount, setOptimizedPhotoCount] = useState(0);
   const [savingDress, setSavingDress] = useState(false);
 
+  const inventorySchema = useMemo(() => getInventorySchemaConfig(storeType), [storeType]);
+
   const loadDresses = useCallback(async () => {
     try {
       setLoading(true);
       const data = await syncInventoryForStore({ storeId, storeType });
       setDresses(data as Dress[]);
     } catch (error) {
-      if (isMissingInventorySchemaError(error)) {
-        Alert.alert('Could not load inventory', getInventorySchemaMissingMessage());
+      if (isMissingInventorySchemaError(error, [inventorySchema.itemTable, inventorySchema.imageTable])) {
+        Alert.alert('Could not load inventory', getInventorySchemaMissingMessage(inventorySchema.titlePlural));
         return;
       }
 
@@ -186,7 +189,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [storeId, storeType]);
+  }, [inventorySchema.imageTable, inventorySchema.itemTable, inventorySchema.titlePlural, storeId, storeType]);
 
   React.useEffect(() => {
     void loadDresses();
@@ -317,7 +320,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
       setSavingDress(true);
 
       const { data: insertedDress, error: dressError } = await scopedSupabase
-        .from('dresses')
+        .from(inventorySchema.itemTable)
         .insert({
           studio_id: storeId,
           created_by: session.user.id,
@@ -332,12 +335,12 @@ export default function InventoryScreen({ route, navigation }: Props) {
       }
 
       const imageRows = sanitizedPhotoUrls.map((url, index) => ({
-        dress_id: insertedDress.id,
+        [inventorySchema.itemForeignKey]: insertedDress.id,
         image_url: url,
         sort_order: index
       }));
 
-      const { error: imagesError } = await scopedSupabase.from('dress_images').insert(imageRows);
+      const { error: imagesError } = await scopedSupabase.from(inventorySchema.imageTable).insert(imageRows);
       if (imagesError) {
         throw imagesError;
       }
@@ -346,15 +349,15 @@ export default function InventoryScreen({ route, navigation }: Props) {
       resetForm();
       await loadDresses();
     } catch (error) {
-      if (isMissingInventorySchemaError(error)) {
-        Alert.alert('Could not save dress', getInventorySchemaMissingMessage());
+      if (isMissingInventorySchemaError(error, [inventorySchema.itemTable, inventorySchema.imageTable])) {
+        Alert.alert(`Could not save ${inventorySchema.titleSingular}`, getInventorySchemaMissingMessage(inventorySchema.titlePlural));
         return;
       }
 
       if (isInventoryRlsError(error)) {
         Alert.alert(
-          'Could not save dress',
-          'Your account is missing permission to add dresses in this studio. Please sign out and sign in again. If the issue persists, apply the latest Supabase migrations from `Mobile_version/` with `npx supabase db push`.'
+          `Could not save ${inventorySchema.titleSingular}`,
+          `Your account is missing permission to add ${inventorySchema.titlePlural} in this studio. Please sign out and sign in again. If the issue persists, apply the latest Supabase migrations from \`Mobile_version/\` with \`npx supabase db push\`.`
         );
         return;
       }
@@ -366,11 +369,11 @@ export default function InventoryScreen({ route, navigation }: Props) {
         photoCount: sanitizedPhotoUrls.length,
         error
       });
-      Alert.alert('Could not save dress', `Unable to save this dress right now. ${debugMessage}`);
+      Alert.alert(`Could not save ${inventorySchema.titleSingular}`, `Unable to save this ${inventorySchema.titleSingular} right now. ${debugMessage}`);
     } finally {
       setSavingDress(false);
     }
-  }, [dressName, loadDresses, photoUrls, priceText, resetForm, session?.user.id, storeId, storeType]);
+  }, [dressName, inventorySchema.imageTable, inventorySchema.itemForeignKey, inventorySchema.itemTable, inventorySchema.titlePlural, inventorySchema.titleSingular, loadDresses, photoUrls, priceText, resetForm, session?.user.id, storeId, storeType]);
 
   const dressTiles = useMemo(
     () =>
@@ -391,14 +394,14 @@ export default function InventoryScreen({ route, navigation }: Props) {
               </View>
             )}
             <Text numberOfLines={2} style={styles.dressName}>
-              {dress.name || 'Untitled dress'}
+              {dress.name || `Untitled ${inventorySchema.titleSingular}`}
             </Text>
             <Text style={styles.dressMeta}>{dress.price ? `$${dress.price.toFixed(2)}` : 'No price'}</Text>
             <Text style={styles.dressMeta}>{dress.dress_images.length} photo(s)</Text>
           </Pressable>
         );
       }),
-    [dresses, navigation, storeId, storeName]
+    [dresses, inventorySchema.titleSingular, navigation, storeId, storeName]
   );
 
   return (
@@ -409,13 +412,13 @@ export default function InventoryScreen({ route, navigation }: Props) {
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" />
-            <Text style={styles.loadingText}>Loading dresses...</Text>
+            <Text style={styles.loadingText}>{`Loading ${inventorySchema.titlePlural}...`}</Text>
           </View>
         ) : (
           <View style={styles.tilesGrid}>
             <Pressable style={[styles.dressTile, styles.addTile]} onPress={openCreateModal}>
               <Text style={styles.addIcon}>＋</Text>
-              <Text style={styles.addLabel}>Add Dress</Text>
+              <Text style={styles.addLabel}>{`Add ${inventorySchema.titleSingular.charAt(0).toUpperCase()}${inventorySchema.titleSingular.slice(1)}`}</Text>
             </Pressable>
             {dressTiles}
           </View>
@@ -425,10 +428,10 @@ export default function InventoryScreen({ route, navigation }: Props) {
       <Modal animationType="slide" transparent visible={showCreateDressModal} onRequestClose={closeCreateModal}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Create dress profile</Text>
+            <Text style={styles.modalTitle}>{`Create ${inventorySchema.titleSingular} profile`}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Dress name (optional)"
+              placeholder={`${inventorySchema.titleSingular.charAt(0).toUpperCase()}${inventorySchema.titleSingular.slice(1)} name (optional)`}
               value={dressName}
               onChangeText={setDressName}
               autoCapitalize="words"
@@ -482,7 +485,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
                 onPress={() => void createDress()}
                 disabled={savingDress}
               >
-                <Text style={styles.saveButtonText}>{savingDress ? 'Saving...' : 'Save dress'}</Text>
+                <Text style={styles.saveButtonText}>{savingDress ? 'Saving...' : `Save ${inventorySchema.titleSingular}`}</Text>
               </Pressable>
             </View>
           </View>
