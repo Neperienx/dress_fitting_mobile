@@ -3,6 +3,7 @@ import { Image } from 'react-native';
 
 import { assertSupabaseConfiguredForStoreType, getSupabaseForStoreType } from '../lib/supabase';
 import { StoreType } from '../types/store';
+import { getInventorySchemaConfig } from './inventoryTables';
 
 export type InventoryDressImage = {
   id: string;
@@ -91,9 +92,11 @@ async function writeCachedInventory(storeId: string, dresses: InventoryDress[]) 
 async function fetchFullInventory(storeId: string, storeType: StoreType) {
   assertSupabaseConfiguredForStoreType(storeType);
   const scopedSupabase = getSupabaseForStoreType(storeType);
+  const inventorySchema = getInventorySchemaConfig(storeType);
+
   const { data, error } = await scopedSupabase
-    .from('dresses')
-    .select('id, name, price, created_at, dress_images(id, image_url, sort_order, created_at)')
+    .from(inventorySchema.itemTable)
+    .select(`id, name, price, created_at, ${inventorySchema.imageRelationField}(id, image_url, sort_order, created_at)`)
     .eq('studio_id', storeId)
     .order('created_at', { ascending: false });
 
@@ -101,15 +104,22 @@ async function fetchFullInventory(storeId: string, storeType: StoreType) {
     throw error;
   }
 
-  return normalizeDresses((data ?? []) as InventoryDress[]);
+  const normalizedRows = ((data ?? []) as Array<InventoryDress & { ring_images?: InventoryDressImage[] }>).map((row) => ({
+    ...row,
+    dress_images: row.dress_images ?? row.ring_images ?? []
+  }));
+
+  return normalizeDresses(normalizedRows);
 }
 
 async function fetchInventoryRevision(storeId: string, storeType: StoreType) {
   assertSupabaseConfiguredForStoreType(storeType);
   const scopedSupabase = getSupabaseForStoreType(storeType);
 
+  const inventorySchema = getInventorySchemaConfig(storeType);
+
   const { data: dresses, error: dressesError } = await scopedSupabase
-    .from('dresses')
+    .from(inventorySchema.itemTable)
     .select('id, created_at')
     .eq('studio_id', storeId)
     .order('created_at', { ascending: false });
@@ -119,9 +129,9 @@ async function fetchInventoryRevision(storeId: string, storeType: StoreType) {
   }
 
   const { data: dressImages, error: imagesError } = await scopedSupabase
-    .from('dress_images')
-    .select('id, sort_order, created_at, dress_id, dresses!inner(studio_id)')
-    .eq('dresses.studio_id', storeId)
+    .from(inventorySchema.imageTable)
+    .select(`id, sort_order, created_at, ${inventorySchema.itemForeignKey}, ${inventorySchema.itemTable}!inner(studio_id)`)
+    .eq(`${inventorySchema.itemTable}.studio_id`, storeId)
     .order('created_at', { ascending: false });
 
   if (imagesError) {
@@ -141,8 +151,13 @@ async function fetchInventoryRevision(storeId: string, storeType: StoreType) {
     ])
   );
 
-  ((dressImages ?? []) as { id: string; sort_order: number; created_at?: string; dress_id: string }[]).forEach((image) => {
-    const dress = dressesById.get(image.dress_id);
+  ((dressImages ?? []) as Array<{ id: string; sort_order: number; created_at?: string; dress_id?: string; ring_id?: string }>).forEach((image) => {
+    const itemId = image.dress_id ?? image.ring_id;
+    if (!itemId) {
+      return;
+    }
+
+    const dress = dressesById.get(itemId);
     if (!dress) {
       return;
     }
