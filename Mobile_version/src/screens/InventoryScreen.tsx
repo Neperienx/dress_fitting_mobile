@@ -171,6 +171,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
   const [photoUrls, setPhotoUrls] = useState<string[]>(emptyPhotoField);
   const [optimizedPhotoCount, setOptimizedPhotoCount] = useState(0);
   const [savingDress, setSavingDress] = useState(false);
+  const [deletingDressId, setDeletingDressId] = useState<string | null>(null);
 
   const inventorySchema = useMemo(() => getInventorySchemaConfig(storeType), [storeType]);
 
@@ -375,33 +376,98 @@ export default function InventoryScreen({ route, navigation }: Props) {
     }
   }, [dressName, inventorySchema.imageTable, inventorySchema.itemForeignKey, inventorySchema.itemTable, inventorySchema.titlePlural, inventorySchema.titleSingular, loadDresses, photoUrls, priceText, resetForm, session?.user.id, storeId, storeType]);
 
+  const deleteDress = useCallback(
+    async (dress: Dress) => {
+      if (deletingDressId) {
+        return;
+      }
+
+      try {
+        assertSupabaseConfiguredForStoreType(storeType);
+        const scopedSupabase = getSupabaseForStoreType(storeType);
+        setDeletingDressId(dress.id);
+
+        const { error } = await scopedSupabase.from(inventorySchema.itemTable).delete().eq('id', dress.id);
+        if (error) {
+          throw error;
+        }
+
+        await loadDresses(true);
+      } catch (error) {
+        if (isInventoryRlsError(error)) {
+          Alert.alert(
+            `Could not delete ${inventorySchema.titleSingular}`,
+            `Your account is missing permission to delete ${inventorySchema.titlePlural} in this studio.`
+          );
+          return;
+        }
+
+        Alert.alert(`Could not delete ${inventorySchema.titleSingular}`, getErrorMessage(error));
+      } finally {
+        setDeletingDressId(null);
+      }
+    },
+    [deletingDressId, inventorySchema.itemTable, inventorySchema.titlePlural, inventorySchema.titleSingular, loadDresses, storeType]
+  );
+
+  const confirmDeleteDress = useCallback(
+    (dress: Dress) => {
+      const displayName = dress.name?.trim() || `this ${inventorySchema.titleSingular}`;
+      Alert.alert(
+        `Delete ${inventorySchema.titleSingular}?`,
+        `Are you sure you want to delete ${displayName}? This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              void deleteDress(dress);
+            }
+          }
+        ]
+      );
+    },
+    [deleteDress, inventorySchema.titleSingular]
+  );
+
   const dressTiles = useMemo(
     () =>
       dresses.map((dress) => {
         const leadImage = dress.dress_images[0]?.image_url;
+        const isDeleting = deletingDressId === dress.id;
 
         return (
-          <Pressable
-            key={dress.id}
-            style={styles.dressTile}
-            onPress={() => navigation.navigate('DressProfile', { storeId, storeName, storeType, dress })}
-          >
-            {leadImage ? (
-              <Image source={{ uri: leadImage }} style={styles.dressImage} resizeMode="cover" />
-            ) : (
-              <View style={[styles.dressImage, styles.imagePlaceholder]}>
-                <Text style={styles.imagePlaceholderText}>No image</Text>
-              </View>
-            )}
-            <Text numberOfLines={2} style={styles.dressName}>
-              {dress.name || `Untitled ${inventorySchema.titleSingular}`}
-            </Text>
-            <Text style={styles.dressMeta}>{dress.price ? `$${dress.price.toFixed(2)}` : 'No price'}</Text>
-            <Text style={styles.dressMeta}>{dress.dress_images.length} photo(s)</Text>
-          </Pressable>
+          <View key={dress.id} style={styles.dressTile}>
+            <Pressable
+              style={styles.deleteButton}
+              onPress={() => confirmDeleteDress(dress)}
+              disabled={isDeleting}
+              hitSlop={6}
+            >
+              <Text style={styles.deleteButtonText}>{isDeleting ? '…' : '✕'}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate('DressProfile', { storeId, storeName, storeType, dress })}
+              style={styles.dressTileContent}
+            >
+              {leadImage ? (
+                <Image source={{ uri: leadImage }} style={styles.dressImage} resizeMode="cover" />
+              ) : (
+                <View style={[styles.dressImage, styles.imagePlaceholder]}>
+                  <Text style={styles.imagePlaceholderText}>No image</Text>
+                </View>
+              )}
+              <Text numberOfLines={2} style={styles.dressName}>
+                {dress.name || `Untitled ${inventorySchema.titleSingular}`}
+              </Text>
+              <Text style={styles.dressMeta}>{dress.price ? `$${dress.price.toFixed(2)}` : 'No price'}</Text>
+              <Text style={styles.dressMeta}>{dress.dress_images.length} photo(s)</Text>
+            </Pressable>
+          </View>
         );
       }),
-    [dresses, inventorySchema.titleSingular, navigation, storeId, storeName]
+    [confirmDeleteDress, deletingDressId, dresses, inventorySchema.titleSingular, navigation, storeId, storeName, storeType]
   );
 
   return (
@@ -510,8 +576,23 @@ const styles = StyleSheet.create({
     borderColor: '#E9E4E6',
     backgroundColor: '#FFFFFF',
     padding: 10,
-    gap: 6
+    gap: 6,
+    position: 'relative'
   },
+  dressTileContent: { gap: 6 },
+  deleteButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(34, 29, 54, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2
+  },
+  deleteButtonText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16, fontWeight: '700' },
   addTile: { alignItems: 'center', justifyContent: 'center', gap: 8 },
   addIcon: { fontSize: 38, color: '#9d99ac' },
   addLabel: { color: '#6B6467', fontWeight: '600' },
