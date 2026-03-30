@@ -30,6 +30,7 @@ type SyncInventoryOptions = {
   storeId: string;
   storeType: StoreType;
   maxCacheAgeMs?: number;
+  forceRefresh?: boolean;
 };
 
 function getInventoryCacheKey(storeId: string) {
@@ -183,7 +184,12 @@ function prefetchInventoryImages(dresses: InventoryDress[]) {
   });
 }
 
-export async function syncInventoryForStore({ storeId, storeType, maxCacheAgeMs = 1000 * 60 * 30 }: SyncInventoryOptions) {
+export async function syncInventoryForStore({
+  storeId,
+  storeType,
+  maxCacheAgeMs = 1000 * 60 * 30,
+  forceRefresh = false
+}: SyncInventoryOptions) {
   const cached = await readCachedInventory(storeId);
 
   if (cached) {
@@ -192,7 +198,7 @@ export async function syncInventoryForStore({ storeId, storeType, maxCacheAgeMs 
 
   const cacheAgeMs = cached ? Date.now() - new Date(cached.lastSyncedAt).getTime() : Number.POSITIVE_INFINITY;
 
-  if (cached && cacheAgeMs <= maxCacheAgeMs) {
+  if (!forceRefresh && cached && cacheAgeMs <= maxCacheAgeMs) {
     return cached.dresses;
   }
 
