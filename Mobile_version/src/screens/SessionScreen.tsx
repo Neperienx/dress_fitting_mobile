@@ -39,6 +39,7 @@ import {
   updateSessionHistoryRecord
 } from '../utils/sessionHistory';
 import { buildSessionRecapSvg, selectShareTopDresses } from '../utils/sessionShare';
+import { rankDressesWithLogisticModel } from '../utils/logisticScoring';
 import { syncInventoryForStore } from '../utils/inventoryCache';
 
 type SessionStage = 'landing' | 'swiping' | 'results';
@@ -494,14 +495,14 @@ export default function SessionScreen() {
         feedbackSubmittedAt
       };
 
-  const rankedDresses = useMemo(() => {
-    return [...activeSessionData.allStoreDresses]
-      .map((dress) => ({
-        dress,
-        score: dress.tags.reduce((total, tag) => total + (activeSessionData.tagScores[tag]?.score ?? 0), 0)
-      }))
-      .sort((a, b) => b.score - a.score);
-  }, [activeSessionData.allStoreDresses, activeSessionData.tagScores]);
+  const rankedDresses = useMemo(
+    () =>
+      rankDressesWithLogisticModel({
+        dresses: activeSessionData.allStoreDresses,
+        dressDecisions: activeSessionData.dressDecisions
+      }),
+    [activeSessionData.allStoreDresses, activeSessionData.dressDecisions]
+  );
 
   const shareTopDresses = useMemo(
     () =>
@@ -1013,6 +1014,11 @@ export default function SessionScreen() {
     return (
       <ScrollView contentContainerStyle={styles.resultsContent}>
         <Text style={styles.resultsTitle}>{showShortlistOnly ? 'Shortlisted dresses' : 'Store ranking'}</Text>
+        {!showShortlistOnly && rankedDresses[0] ? (
+          <Text style={styles.resultsSubtitle}>
+            Model pick: {rankedDresses[0].dress.name || 'Untitled dress'} ({Math.round(rankedDresses[0].probability * 100)}% match)
+          </Text>
+        ) : null}
         {shouldShowFeedbackSection ? renderFeedbackSection() : null}
         {dressesToShow.length === 0 ? (
           <Text style={styles.placeholderHint}>No dresses yet. Tap ☆ on a dress to build a shortlist.</Text>
@@ -1058,7 +1064,7 @@ export default function SessionScreen() {
                       <Text style={[styles.shortlistStar, isShortlisted && styles.shortlistStarActive]}>★</Text>
                     </Pressable>
                   </View>
-                  <Text style={styles.rankingScore}>Score: {entry.score}</Text>
+                  <Text style={styles.rankingScore}>Match likelihood: {Math.round(entry.probability * 100)}%</Text>
                   <Text style={styles.rankingHint}>Double tap image to shortlist</Text>
                   {decision ? <Text style={styles.decisionPill}>Session action: {decision}</Text> : null}
                 </View>
