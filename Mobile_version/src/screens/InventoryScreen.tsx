@@ -45,11 +45,16 @@ type PickerAsset = {
 };
 
 type MaybeImagePickerModule = {
+  MediaTypeOptions?: {
+    Images?: string;
+  };
   requestMediaLibraryPermissionsAsync: () => Promise<{ granted: boolean }>;
   launchImageLibraryAsync: (options: {
-    mediaTypes: string[];
+    mediaTypes: string | string[];
     allowsMultipleSelection: boolean;
     selectionLimit?: number;
+    orderedSelection?: boolean;
+    legacy?: boolean;
     quality: number;
     base64?: boolean;
   }) => Promise<{ canceled: boolean; assets: PickerAsset[] }>;
@@ -296,10 +301,13 @@ export default function InventoryScreen({ route, navigation }: Props) {
       return;
     }
 
+    const mediaTypes = imagePicker.MediaTypeOptions?.Images ?? 'images';
     const result = await imagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes,
       allowsMultipleSelection: true,
-      selectionLimit: 0,
+      selectionLimit: 20,
+      orderedSelection: true,
+      legacy: false,
       quality: inventoryUploadQuality,
       base64: true
     });
