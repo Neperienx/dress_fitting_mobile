@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 import { Image } from 'react-native';
 
 import { assertSupabaseConfiguredForStoreType, getSupabaseForStoreType } from '../lib/supabase';
@@ -10,6 +11,7 @@ export type InventoryDressImage = {
   image_url: string;
   sort_order: number;
   created_at?: string;
+  updated_at?: string;
 };
 
 export type InventoryDress = {
@@ -37,6 +39,10 @@ function getInventoryCacheKey(storeId: string) {
   return `inventory-cache:${storeId}`;
 }
 
+function getInventoryImageIndexKey(storeId: string) {
+  return `inventory-image-index:${storeId}`;
+}
+
 function normalizeDresses(dresses: InventoryDress[]) {
   return dresses.map((dress) => ({
     ...dress,
@@ -51,7 +57,9 @@ function buildRevisionToken(dresses: InventoryDress[]) {
     .join('|');
 
   const imageToken = dresses
-    .flatMap((dress) => (dress.dress_images ?? []).map((image) => `${dress.id}:${image.id}:${image.created_at ?? ''}:${image.sort_order}`))
+    .flatMap((dress) =>
+      (dress.dress_images ?? []).map((image) => `${dress.id}:${image.id}:${image.created_at ?? ''}:${image.updated_at ?? ''}:${image.sort_order}`)
+    )
     .sort()
     .join('|');
 
@@ -97,7 +105,7 @@ async function fetchFullInventory(storeId: string, storeType: StoreType) {
 
   const { data, error } = await scopedSupabase
     .from(inventorySchema.itemTable)
-    .select(`id, name, price, created_at, ${inventorySchema.imageRelationField}(id, image_url, sort_order, created_at)`)
+    .select(`id, name, price, created_at, ${inventorySchema.imageRelationField}(id, image_url, sort_order, created_at, updated_at)`)
     .eq('studio_id', storeId)
     .order('created_at', { ascending: false });
 
@@ -131,7 +139,7 @@ async function fetchInventoryRevision(storeId: string, storeType: StoreType) {
 
   const { data: dressImages, error: imagesError } = await scopedSupabase
     .from(inventorySchema.imageTable)
-    .select(`id, sort_order, created_at, ${inventorySchema.itemForeignKey}, ${inventorySchema.itemTable}!inner(studio_id)`)
+    .select(`id, sort_order, created_at, updated_at, ${inventorySchema.itemForeignKey}, ${inventorySchema.itemTable}!inner(studio_id)`)
     .eq(`${inventorySchema.itemTable}.studio_id`, storeId)
     .order('created_at', { ascending: false });
 
@@ -152,7 +160,7 @@ async function fetchInventoryRevision(storeId: string, storeType: StoreType) {
     ])
   );
 
-  ((dressImages ?? []) as Array<{ id: string; sort_order: number; created_at?: string; dress_id?: string; ring_id?: string }>).forEach((image) => {
+  ((dressImages ?? []) as Array<{ id: string; sort_order: number; created_at?: string; updated_at?: string; dress_id?: string; ring_id?: string }>).forEach((image) => {
     const itemId = image.dress_id ?? image.ring_id;
     if (!itemId) {
       return;
@@ -167,7 +175,8 @@ async function fetchInventoryRevision(storeId: string, storeType: StoreType) {
       id: image.id,
       image_url: '',
       sort_order: image.sort_order,
-      created_at: image.created_at
+      created_at: image.created_at,
+      updated_at: image.updated_at
     });
   });
 
@@ -182,6 +191,124 @@ function prefetchInventoryImages(dresses: InventoryDress[]) {
   urls.forEach((url) => {
     void Image.prefetch(url);
   });
+}
+
+type ImageCacheIndex = Record<string, { remoteUrl: string; localUri: string }>;
+
+function getImageCacheRootDir() {
+  if (!FileSystem.documentDirectory) {
+    return null;
+  }
+
+  return `${FileSystem.documentDirectory}inventory-image-cache`;
+}
+
+async function readImageCacheIndex(storeId: string) {
+  const raw = await AsyncStorage.getItem(getInventoryImageIndexKey(storeId));
+  if (!raw) {
+    return {} as ImageCacheIndex;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as ImageCacheIndex;
+    return parsed && typeof parsed === 'object' ? parsed : ({} as ImageCacheIndex);
+  } catch {
+    return {} as ImageCacheIndex;
+  }
+}
+
+async function writeImageCacheIndex(storeId: string, next: ImageCacheIndex) {
+  await AsyncStorage.setItem(getInventoryImageIndexKey(storeId), JSON.stringify(next));
+}
+
+function getFileExtensionFromUrl(url: string) {
+  const cleaned = url.split('?')[0].split('#')[0];
+  const parts = cleaned.split('.');
+  const ext = parts.length > 1 ? parts[parts.length - 1].toLowerCase() : 'jpg';
+  if (/^[a-z0-9]{2,6}$/.test(ext)) {
+    return ext;
+  }
+
+  return 'jpg';
+}
+
+function buildImageCacheFilePath(storeId: string, imageId: string, remoteUrl: string) {
+  const root = getImageCacheRootDir();
+  if (!root) {
+    return null;
+  }
+
+  const ext = getFileExtensionFromUrl(remoteUrl);
+  const encoded = encodeURIComponent(remoteUrl).slice(-80);
+  return `${root}/${storeId}/${imageId}-${encoded}.${ext}`;
+}
+
+async function ensureInventoryImageCached(storeId: string, imageId: string, remoteUrl: string, currentIndex: ImageCacheIndex) {
+  const current = currentIndex[imageId];
+  if (current?.remoteUrl === remoteUrl) {
+    const info = await FileSystem.getInfoAsync(current.localUri);
+    if (info.exists) {
+      return current.localUri;
+    }
+  }
+
+  const targetPath = buildImageCacheFilePath(storeId, imageId, remoteUrl);
+  if (!targetPath) {
+    return remoteUrl;
+  }
+
+  const lastSlash = targetPath.lastIndexOf('/');
+  const directory = targetPath.slice(0, lastSlash);
+  await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+
+  try {
+    await FileSystem.downloadAsync(remoteUrl, targetPath);
+    currentIndex[imageId] = { remoteUrl, localUri: targetPath };
+    return targetPath;
+  } catch {
+    return current?.localUri ?? remoteUrl;
+  }
+}
+
+async function hydrateDressesWithLocalImageCache(storeId: string, dresses: InventoryDress[]) {
+  const cacheRoot = getImageCacheRootDir();
+  if (!cacheRoot) {
+    return dresses;
+  }
+
+  const nextImageIndex = await readImageCacheIndex(storeId);
+  const activeImageIds = new Set<string>();
+
+  const localizedDresses: InventoryDress[] = [];
+  for (const dress of dresses) {
+    const localizedImages: InventoryDressImage[] = [];
+    for (const image of dress.dress_images) {
+      const remoteUrl = image.image_url?.trim();
+      if (!remoteUrl || !/^https?:\/\//i.test(remoteUrl)) {
+        localizedImages.push(image);
+        continue;
+      }
+
+      activeImageIds.add(image.id);
+      const localUri = await ensureInventoryImageCached(storeId, image.id, remoteUrl, nextImageIndex);
+      localizedImages.push({
+        ...image,
+        image_url: localUri
+      });
+    }
+
+    localizedDresses.push({
+      ...dress,
+      dress_images: localizedImages
+    });
+  }
+
+  const prunedImageIndex = Object.fromEntries(
+    Object.entries(nextImageIndex).filter(([imageId]) => activeImageIds.has(imageId))
+  ) as ImageCacheIndex;
+  await writeImageCacheIndex(storeId, prunedImageIndex);
+
+  return localizedDresses;
 }
 
 export async function syncInventoryForStore({
@@ -205,9 +332,10 @@ export async function syncInventoryForStore({
   try {
     if (!cached) {
       const dresses = await fetchFullInventory(storeId, storeType);
-      await writeCachedInventory(storeId, dresses);
-      prefetchInventoryImages(dresses);
-      return dresses;
+      const localizedDresses = await hydrateDressesWithLocalImageCache(storeId, dresses);
+      await writeCachedInventory(storeId, localizedDresses);
+      prefetchInventoryImages(localizedDresses);
+      return localizedDresses;
     }
 
     const remoteRevision = await fetchInventoryRevision(storeId, storeType);
@@ -216,9 +344,10 @@ export async function syncInventoryForStore({
     }
 
     const freshDresses = await fetchFullInventory(storeId, storeType);
-    await writeCachedInventory(storeId, freshDresses);
-    prefetchInventoryImages(freshDresses);
-    return freshDresses;
+    const localizedFreshDresses = await hydrateDressesWithLocalImageCache(storeId, freshDresses);
+    await writeCachedInventory(storeId, localizedFreshDresses);
+    prefetchInventoryImages(localizedFreshDresses);
+    return localizedFreshDresses;
   } catch (error) {
     if (cached) {
       return cached.dresses;
