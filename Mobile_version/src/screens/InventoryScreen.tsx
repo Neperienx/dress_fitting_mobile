@@ -69,6 +69,7 @@ type MaybeDocumentPickerModule = {
 
 const emptyPhotoField: string[] = [];
 const inventoryUploadQuality = 0.72;
+const inventoryStorageBucket = 'inventory-images';
 
 const allowedImageUriSchemes = ['http://', 'https://', 'file://', 'content://', 'data:image/'];
 
@@ -103,6 +104,61 @@ function getImageStorageSavingsMessage(optimizedCount: number, totalCount: numbe
   }
 
   return 'Selected photos will be saved as-is because this picker could not provide compressible image data.';
+}
+
+function getFileExtensionFromMimeType(mimeType: string | null) {
+  switch (mimeType) {
+    case 'image/png':
+      return 'png';
+    case 'image/webp':
+      return 'webp';
+    case 'image/heic':
+      return 'heic';
+    case 'image/heif':
+      return 'heif';
+    default:
+      return 'jpg';
+  }
+}
+
+function getMimeTypeFromDataUri(value: string) {
+  const match = value.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/i);
+  return match?.[1]?.toLowerCase() ?? 'image/jpeg';
+}
+
+async function uploadPhotoToStorage(params: {
+  scopedSupabase: ReturnType<typeof getSupabaseForStoreType>;
+  storeType: string;
+  storeId: string;
+  itemId: string;
+  sourceUri: string;
+  sortOrder: number;
+}) {
+  const { scopedSupabase, storeType, storeId, itemId, sourceUri, sortOrder } = params;
+  if (/^https?:\/\//i.test(sourceUri)) {
+    return sourceUri;
+  }
+
+  const mimeType = sourceUri.startsWith('data:image/') ? getMimeTypeFromDataUri(sourceUri) : 'image/jpeg';
+  const extension = getFileExtensionFromMimeType(mimeType);
+  const objectPath = `${storeType}/${storeId}/${itemId}/${Date.now()}-${sortOrder}.${extension}`;
+
+  const response = await fetch(sourceUri);
+  const blob = await response.blob();
+  const { error: uploadError } = await scopedSupabase.storage.from(inventoryStorageBucket).upload(objectPath, blob, {
+    contentType: mimeType,
+    upsert: true
+  });
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  const { data } = scopedSupabase.storage.from(inventoryStorageBucket).getPublicUrl(objectPath);
+  if (!data.publicUrl) {
+    throw new Error('Could not resolve uploaded image URL.');
+  }
+
+  return data.publicUrl;
 }
 
 function getErrorMessage(error: unknown) {
@@ -395,7 +451,20 @@ export default function InventoryScreen({ route, navigation }: Props) {
         throw dressError;
       }
 
-      const imageRows = sanitizedPhotoUrls.map((url, index) => ({
+      const uploadedPhotoUrls = await Promise.all(
+        sanitizedPhotoUrls.map((photoUrl, index) =>
+          uploadPhotoToStorage({
+            scopedSupabase,
+            storeType,
+            storeId,
+            itemId: insertedDress.id,
+            sourceUri: photoUrl,
+            sortOrder: index
+          })
+        )
+      );
+
+      const imageRows = uploadedPhotoUrls.map((url, index) => ({
         [inventorySchema.itemForeignKey]: insertedDress.id,
         image_url: url,
         sort_order: index
