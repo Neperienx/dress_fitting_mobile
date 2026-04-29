@@ -53,10 +53,18 @@ type MaybeDocumentPickerModule = {
 const emptyPhotoField: string[] = [];
 
 const allowedImageUriSchemes = ['http://', 'https://', 'file://', 'content://', 'data:image/'];
+const inventoryImagesBucket = 'inventory-images';
 
 function isSupportedImageUri(value: string) {
   const normalized = value.trim().toLowerCase();
   return allowedImageUriSchemes.some((scheme) => normalized.startsWith(scheme));
+}
+
+function getFileExtensionFromUri(uri: string) {
+  const withoutQuery = uri.split('?')[0] ?? uri;
+  const lastSegment = withoutQuery.split('/').pop() ?? '';
+  const match = /\.([a-zA-Z0-9]+)$/.exec(lastSegment);
+  return match?.[1]?.toLowerCase() ?? 'jpg';
 }
 
 function getErrorMessage(error: unknown) {
@@ -294,7 +302,33 @@ export default function InventoryScreen({ route, navigation }: Props) {
         throw dressError;
       }
 
-      const imageRows = sanitizedPhotoUrls.map((url, index) => ({
+      const uploadedImageUrls = await Promise.all(
+        sanitizedPhotoUrls.map(async (photoUri, index) => {
+          if (photoUri.startsWith('http://') || photoUri.startsWith('https://')) {
+            return photoUri;
+          }
+
+          const uploadPath = `${storeId}/${insertedDress.id}/${Date.now()}-${index}.${getFileExtensionFromUri(photoUri)}`;
+          const fileResponse = await fetch(photoUri);
+          const fileBlob = await fileResponse.blob();
+
+          const { error: uploadError } = await supabase.storage
+            .from(inventoryImagesBucket)
+            .upload(uploadPath, fileBlob, {
+              upsert: false,
+              contentType: fileBlob.type || 'image/jpeg'
+            });
+
+          if (uploadError) {
+            throw uploadError;
+          }
+
+          const { data: publicUrlData } = supabase.storage.from(inventoryImagesBucket).getPublicUrl(uploadPath);
+          return publicUrlData.publicUrl;
+        })
+      );
+
+      const imageRows = uploadedImageUrls.map((url, index) => ({
         dress_id: insertedDress.id,
         image_url: url,
         sort_order: index
