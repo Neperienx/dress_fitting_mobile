@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
+import { getAuthErrorMessage } from '../utils/authErrors';
 
 export default function ForgotPasswordScreen() {
   const { resetPassword } = useAuth();
@@ -12,7 +13,7 @@ export default function ForgotPasswordScreen() {
       await resetPassword(username);
       Alert.alert('Reset sent', 'If the username exists, reset instructions were sent.');
     } catch (error) {
-      Alert.alert('Reset failed', (error as Error).message);
+      Alert.alert('Reset failed', getAuthErrorMessage(error));
     }
   };
 

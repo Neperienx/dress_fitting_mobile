@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../context/AuthContext';
+import { getAuthErrorMessage } from '../utils/authErrors';
 
 type AuthStackParamList = {
   Login: undefined;
@@ -23,7 +24,7 @@ export default function SignupScreen({ navigation }: Props) {
       Alert.alert('Account created', 'You can now sign in with your username and password.');
       navigation.navigate('Login');
     } catch (error) {
-      Alert.alert('Sign-up failed', (error as Error).message);
+      Alert.alert('Sign-up failed', getAuthErrorMessage(error));
     }
   };
 

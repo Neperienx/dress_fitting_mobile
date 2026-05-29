@@ -3,6 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../context/AuthContext';
+import { getAuthErrorMessage } from '../utils/authErrors';
 
 type AuthStackParamList = {
   Login: undefined;
@@ -21,7 +22,7 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       await signIn(username, password);
     } catch (error) {
-      Alert.alert('Login failed', (error as Error).message);
+      Alert.alert('Login failed', getAuthErrorMessage(error));
     }
   };
 
