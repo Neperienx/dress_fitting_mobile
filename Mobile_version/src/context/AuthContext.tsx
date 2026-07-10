@@ -29,6 +29,7 @@ type AuthContextValue = {
   signUp: (input: SignUpInput) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (username: string) => Promise<void>;
+  requestAccountDeletion: (reason?: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -85,6 +86,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         assertSupabaseConfigured();
         const { error } = await supabase.auth.resetPasswordForEmail(usernameToEmail(username));
         if (error) throw error;
+      },
+      requestAccountDeletion: async (reason?: string) => {
+        assertSupabaseConfigured();
+        const currentUser = session?.user;
+        if (!currentUser?.id) {
+          throw new Error('Please sign in again before requesting account deletion.');
+        }
+
+        const { error } = await supabase.from('account_deletion_requests').insert({
+          user_id: currentUser.id,
+          email: currentUser.email ?? null,
+          reason: reason?.trim() || null,
+          preserve_store_data: true,
+          status: 'requested'
+        });
+        if (error) throw error;
+
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) throw signOutError;
       }
     }),
     [loading, session]

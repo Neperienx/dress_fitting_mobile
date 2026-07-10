@@ -14,8 +14,13 @@ import {
   View
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { useAuth } from '../context/AuthContext';
+import {
+  generateDebugInventoryProfile,
+  getOpenAiInventoryDebugStatus
+} from '../debug/openaiInventoryProfile';
 import { assertSupabaseConfiguredForStoreType, getSupabaseForStoreType } from '../lib/supabase';
 import { syncInventoryForStore } from '../utils/inventoryCache';
 import { getInventorySchemaConfig } from '../utils/inventoryTables';
@@ -42,6 +47,8 @@ type PickerAsset = {
   uri: string;
   base64?: string | null;
   mimeType?: string | null;
+  name?: string | null;
+  fileName?: string | null;
 };
 
 type MaybeImagePickerModule = {
@@ -64,14 +71,27 @@ type MaybeDocumentPickerModule = {
   getDocumentAsync: (options: {
     type: string;
     multiple: boolean;
+    copyToCacheDirectory?: boolean;
   }) => Promise<{ canceled: boolean; assets: PickerAsset[] }>;
+};
+
+type DebugNotification = {
+  tone: 'info' | 'success' | 'error';
+  message: string;
 };
 
 const emptyPhotoField: string[] = [];
 const inventoryUploadQuality = 0.72;
 const inventoryStorageBucket = 'inventory-images';
+const debugGeneratedPhotoCountMarker = -1;
+const stableLocalPhotoCountMarker = -2;
+const base64Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 const allowedImageUriSchemes = ['http://', 'https://', 'file://', 'content://', 'data:image/'];
+
+function getTagStorageKey(itemId: string) {
+  return `dress-tags:${itemId}`;
+}
 
 function isSupportedImageUri(value: string) {
   const normalized = value.trim().toLowerCase();
@@ -86,21 +106,66 @@ function getNormalizedImageMimeType(mimeType?: string | null) {
   return 'image/jpeg';
 }
 
-function getOptimizedStorageUri(asset: PickerAsset) {
+function getPendingUploadRootDir() {
+  if (!FileSystem.documentDirectory) {
+    throw new Error('Expo file storage is unavailable in this runtime.');
+  }
+
+  return `${FileSystem.documentDirectory}inventory-pending-uploads`;
+}
+
+function getStableLocalPhotoPath(extension: string) {
+  const safeExtension = /^[a-z0-9]{2,6}$/i.test(extension) ? extension.toLowerCase() : 'jpg';
+  return `${getPendingUploadRootDir()}/${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExtension}`;
+}
+
+async function ensurePendingUploadDir() {
+  await FileSystem.makeDirectoryAsync(getPendingUploadRootDir(), { intermediates: true });
+}
+
+async function writeBase64ToStableLocalPhoto(base64Value: string, mimeType?: string | null) {
+  await ensurePendingUploadDir();
+  const targetUri = getStableLocalPhotoPath(getFileExtensionFromMimeType(getNormalizedImageMimeType(mimeType)));
+  await FileSystem.writeAsStringAsync(targetUri, base64Value, {
+    encoding: FileSystem.EncodingType.Base64
+  });
+  return targetUri;
+}
+
+async function copyAssetToStableLocalPhoto(asset: PickerAsset) {
+  await ensurePendingUploadDir();
+  const targetUri = getStableLocalPhotoPath(getFileExtensionFromMimeType(getNormalizedImageMimeType(asset.mimeType)));
+  await FileSystem.copyAsync({ from: asset.uri, to: targetUri });
+  return targetUri;
+}
+
+async function getStableStorageUri(asset: PickerAsset) {
   if (asset.base64 && asset.base64.trim().length > 0) {
-    return `data:${getNormalizedImageMimeType(asset.mimeType)};base64,${asset.base64}`;
+    return writeBase64ToStableLocalPhoto(asset.base64, asset.mimeType);
+  }
+
+  if (isLocalImageUri(asset.uri)) {
+    return copyAssetToStableLocalPhoto(asset);
   }
 
   return asset.uri.trim();
 }
 
 function getImageStorageSavingsMessage(optimizedCount: number, totalCount: number) {
+  if (optimizedCount === debugGeneratedPhotoCountMarker) {
+    return 'Debug-generated images will be uploaded to inventory storage when saved.';
+  }
+
+  if (optimizedCount === stableLocalPhotoCountMarker) {
+    return 'Selected photos were copied into app storage and will upload to Supabase when saved.';
+  }
+
   if (optimizedCount === totalCount) {
-    return 'All selected photos will be optimized before they are saved.';
+    return 'All selected photos were copied into the form and will upload from stable image data.';
   }
 
   if (optimizedCount > 0) {
-    return `${optimizedCount} of ${totalCount} selected photo(s) will be optimized before saving.`;
+    return `${optimizedCount} of ${totalCount} selected photo(s) were copied into stable image data.`;
   }
 
   return 'Selected photos will be saved as-is because this picker could not provide compressible image data.';
@@ -126,6 +191,105 @@ function getMimeTypeFromDataUri(value: string) {
   return match?.[1]?.toLowerCase() ?? 'image/jpeg';
 }
 
+function isLocalImageUri(value: string) {
+  return /^file:\/\//i.test(value) || /^content:\/\//i.test(value);
+}
+
+function getBase64PayloadFromDataUri(value: string) {
+  const marker = ';base64,';
+  const markerIndex = value.indexOf(marker);
+  if (markerIndex < 0) {
+    throw new Error('Generated image is not a valid base64 data URI.');
+  }
+
+  return value.slice(markerIndex + marker.length);
+}
+
+function base64ToArrayBuffer(base64Value: string) {
+  const normalizedBase64 = base64Value.replace(/\s/g, '');
+  const padding = normalizedBase64.endsWith('==') ? 2 : normalizedBase64.endsWith('=') ? 1 : 0;
+  const outputLength = Math.floor((normalizedBase64.length * 3) / 4) - padding;
+  const buffer = new ArrayBuffer(outputLength);
+  const bytes = new Uint8Array(buffer);
+  let byteIndex = 0;
+
+  for (let index = 0; index < normalizedBase64.length; index += 4) {
+    const encodedA = base64Alphabet.indexOf(normalizedBase64[index]);
+    const encodedB = base64Alphabet.indexOf(normalizedBase64[index + 1]);
+    const encodedC = normalizedBase64[index + 2] === '=' ? 0 : base64Alphabet.indexOf(normalizedBase64[index + 2]);
+    const encodedD = normalizedBase64[index + 3] === '=' ? 0 : base64Alphabet.indexOf(normalizedBase64[index + 3]);
+
+    if (encodedA < 0 || encodedB < 0 || encodedC < 0 || encodedD < 0) {
+      throw new Error('Generated image contains invalid base64 data.');
+    }
+
+    const chunk = (encodedA << 18) | (encodedB << 12) | (encodedC << 6) | encodedD;
+    if (byteIndex < outputLength) {
+      bytes[byteIndex] = (chunk >> 16) & 255;
+      byteIndex += 1;
+    }
+    if (byteIndex < outputLength) {
+      bytes[byteIndex] = (chunk >> 8) & 255;
+      byteIndex += 1;
+    }
+    if (byteIndex < outputLength) {
+      bytes[byteIndex] = chunk & 255;
+      byteIndex += 1;
+    }
+  }
+
+  return buffer;
+}
+
+async function getUploadBodyFromSourceUri(sourceUri: string) {
+  if (sourceUri.startsWith('data:image/')) {
+    return base64ToArrayBuffer(getBase64PayloadFromDataUri(sourceUri));
+  }
+
+  if (isLocalImageUri(sourceUri)) {
+    try {
+      const base64Value = await FileSystem.readAsStringAsync(sourceUri, {
+        encoding: FileSystem.EncodingType.Base64
+      });
+      return base64ToArrayBuffer(base64Value);
+    } catch (error) {
+      throw new Error(`Could not read the selected phone image before upload. ${getErrorMessage(error)}`);
+    }
+  }
+
+  const response = await fetch(sourceUri);
+  if (!response.ok) {
+    throw new Error(`Could not read image before upload. HTTP ${response.status}.`);
+  }
+
+  return response.blob();
+}
+
+async function assertUploadSourceReadable(sourceUri: string) {
+  if (!isLocalImageUri(sourceUri)) {
+    return;
+  }
+
+  const info = await FileSystem.getInfoAsync(sourceUri);
+  if (!info.exists) {
+    throw new Error(
+      'The selected photo is no longer available on this device. Clear it, choose the photo again, and save immediately after it is copied into the form.'
+    );
+  }
+}
+
+async function deletePendingLocalPhoto(sourceUri: string) {
+  if (!sourceUri.startsWith(getPendingUploadRootDir())) {
+    return;
+  }
+
+  try {
+    await FileSystem.deleteAsync(sourceUri, { idempotent: true });
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
 async function uploadPhotoToStorage(params: {
   scopedSupabase: ReturnType<typeof getSupabaseForStoreType>;
   storeType: string;
@@ -143,9 +307,9 @@ async function uploadPhotoToStorage(params: {
   const extension = getFileExtensionFromMimeType(mimeType);
   const objectPath = `${storeType}/${storeId}/${itemId}/${Date.now()}-${sortOrder}.${extension}`;
 
-  const response = await fetch(sourceUri);
-  const blob = await response.blob();
-  const { error: uploadError } = await scopedSupabase.storage.from(inventoryStorageBucket).upload(objectPath, blob, {
+  const uploadBody = await getUploadBodyFromSourceUri(sourceUri);
+
+  const { error: uploadError } = await scopedSupabase.storage.from(inventoryStorageBucket).upload(objectPath, uploadBody, {
     contentType: mimeType,
     upsert: true
   });
@@ -224,7 +388,8 @@ function loadDocumentPickerModule(): MaybeDocumentPickerModule | null {
 
 export default function InventoryScreen({ route, navigation }: Props) {
   const { session } = useAuth();
-  const { storeId, storeName, storeType } = route.params;
+  const { storeId, storeName, storeType, storeRole } = route.params;
+  const canManageInventory = storeRole === 'owner';
 
   const [dresses, setDresses] = useState<Dress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -233,11 +398,19 @@ export default function InventoryScreen({ route, navigation }: Props) {
   const [priceText, setPriceText] = useState('');
   const [photoUrls, setPhotoUrls] = useState<string[]>(emptyPhotoField);
   const [optimizedPhotoCount, setOptimizedPhotoCount] = useState(0);
+  const [showDebugGenerator, setShowDebugGenerator] = useState(false);
+  const [debugPrompt, setDebugPrompt] = useState('');
+  const [debugImageCount, setDebugImageCount] = useState<2 | 3>(3);
+  const [generatingDebugProfile, setGeneratingDebugProfile] = useState(false);
+  const [generatedTagSuggestions, setGeneratedTagSuggestions] = useState<string[]>([]);
+  const [debugNotification, setDebugNotification] = useState<DebugNotification | null>(null);
   const [savingDress, setSavingDress] = useState(false);
   const [deletingDressId, setDeletingDressId] = useState<string | null>(null);
   const [tagCountByDressId, setTagCountByDressId] = useState<Record<string, number>>({});
 
   const inventorySchema = useMemo(() => getInventorySchemaConfig(storeType), [storeType]);
+  const openAiDebugStatus = getOpenAiInventoryDebugStatus();
+  const canShowOpenAiDebugGenerator = canManageInventory && openAiDebugStatus.available;
 
   const loadDresses = useCallback(async (forceRefresh = false) => {
     try {
@@ -271,7 +444,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
         return;
       }
 
-      const keys = dresses.map((dress) => `dress-tags:${dress.id}`);
+      const keys = dresses.map((dress) => getTagStorageKey(dress.id));
       const entries = await AsyncStorage.multiGet(keys);
       if (!isMounted) {
         return;
@@ -313,35 +486,52 @@ export default function InventoryScreen({ route, navigation }: Props) {
     setPriceText('');
     setPhotoUrls(emptyPhotoField);
     setOptimizedPhotoCount(0);
+    setShowDebugGenerator(false);
+    setDebugPrompt('');
+    setDebugImageCount(3);
+    setGeneratingDebugProfile(false);
+    setGeneratedTagSuggestions([]);
+    setDebugNotification(null);
   }, []);
 
   const openCreateModal = useCallback(() => {
+    if (!canManageInventory) {
+      Alert.alert('Owner access required', `Only store owners can add ${inventorySchema.titlePlural}.`);
+      return;
+    }
+
     resetForm();
     setShowCreateDressModal(true);
-  }, [resetForm]);
+  }, [canManageInventory, inventorySchema.titlePlural, resetForm]);
 
   const closeCreateModal = useCallback(() => {
-    if (savingDress) {
+    if (savingDress || generatingDebugProfile) {
       return;
     }
 
     setShowCreateDressModal(false);
-  }, [savingDress]);
+  }, [generatingDebugProfile, savingDress]);
 
-  const appendPhotoAssets = useCallback((assets: PickerAsset[]) => {
+  const appendPhotoAssets = useCallback(async (assets: PickerAsset[]) => {
     if (assets.length === 0) {
       return;
     }
 
-    const optimizedUris = assets.map(getOptimizedStorageUri).filter(Boolean);
-    const optimizedCountDelta = assets.filter((asset) => Boolean(asset.base64 && asset.base64.trim().length > 0)).length;
+    try {
+      const optimizedUris = (await Promise.all(assets.map(getStableStorageUri))).filter(Boolean);
 
-    if (optimizedUris.length === 0) {
-      return;
+      if (optimizedUris.length === 0) {
+        return;
+      }
+
+      setPhotoUrls((previous) => [...previous, ...optimizedUris]);
+      setOptimizedPhotoCount(stableLocalPhotoCountMarker);
+    } catch (error) {
+      Alert.alert(
+        'Could not prepare photo',
+        `The selected image could not be copied into the inventory form. ${getErrorMessage(error)}`
+      );
     }
-
-    setPhotoUrls((previous) => [...previous, ...optimizedUris]);
-    setOptimizedPhotoCount((previous) => previous + optimizedCountDelta);
   }, []);
 
   const pickFromGallery = useCallback(async () => {
@@ -372,7 +562,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
       return;
     }
 
-    appendPhotoAssets(result.assets);
+    await appendPhotoAssets(result.assets);
   }, [appendPhotoAssets]);
 
   const pickFromFiles = useCallback(async () => {
@@ -384,57 +574,67 @@ export default function InventoryScreen({ route, navigation }: Props) {
 
     const result = await documentPicker.getDocumentAsync({
       type: 'image/*',
-      multiple: true
+      multiple: true,
+      copyToCacheDirectory: true
     });
 
     if (result.canceled) {
       return;
     }
 
-    appendPhotoAssets(result.assets);
+    await appendPhotoAssets(result.assets);
   }, [appendPhotoAssets]);
 
   const clearPhotos = useCallback(() => {
     setPhotoUrls([]);
     setOptimizedPhotoCount(0);
+    setGeneratedTagSuggestions([]);
+    setDebugNotification(null);
   }, []);
 
-  const createDress = useCallback(async () => {
-    const trimmedName = dressName.trim();
-    const trimmedPrice = priceText.trim();
-    const sanitizedPhotoUrls = photoUrls.map((photo) => photo.trim()).filter(Boolean);
+  const saveInventoryItem = useCallback(async (params: {
+    name: string;
+    price: string;
+    imageUris: string[];
+    tags: string[];
+  }) => {
+    const trimmedName = params.name.trim();
+    const trimmedPrice = params.price.trim();
+    const sanitizedPhotoUrls = params.imageUris.map((photo) => photo.trim()).filter(Boolean);
+
+    if (!canManageInventory) {
+      throw new Error(`Only store owners can add ${inventorySchema.titlePlural}.`);
+    }
 
     if (!session?.user.id) {
-      Alert.alert('Not signed in', 'Please sign in again before creating a dress.');
-      return;
+      throw new Error(`Please sign in again before creating a ${inventorySchema.titleSingular}.`);
     }
 
     if (sanitizedPhotoUrls.length === 0) {
-      Alert.alert('At least one photo required', 'Please add at least one photo URI before saving.');
-      return;
+      throw new Error('At least one generated or selected photo is required before saving.');
     }
 
     if (sanitizedPhotoUrls.some((photoUri) => !isSupportedImageUri(photoUri))) {
-      Alert.alert(
-        'Invalid photo URI',
-        'Use an image URI that starts with http://, https://, file://, content://, or data:image/.'
-      );
-      return;
+      throw new Error('Use an image URI that starts with http://, https://, file://, content://, or data:image/.');
     }
 
     let parsedPrice: number | null = null;
     if (trimmedPrice) {
       parsedPrice = Number(trimmedPrice);
       if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
-        Alert.alert('Invalid price', 'Price must be a positive number.');
-        return;
+        throw new Error('Price must be a positive number.');
       }
     }
 
+    assertSupabaseConfiguredForStoreType(storeType);
+    const scopedSupabase = getSupabaseForStoreType(storeType);
+    setSavingDress(true);
+    let insertedItemId: string | null = null;
+
     try {
-      assertSupabaseConfiguredForStoreType(storeType);
-      const scopedSupabase = getSupabaseForStoreType(storeType);
-      setSavingDress(true);
+      for (const photoUrl of sanitizedPhotoUrls) {
+        await assertUploadSourceReadable(photoUrl);
+      }
 
       const { data: insertedDress, error: dressError } = await scopedSupabase
         .from(inventorySchema.itemTable)
@@ -450,19 +650,20 @@ export default function InventoryScreen({ route, navigation }: Props) {
       if (dressError) {
         throw dressError;
       }
+      insertedItemId = insertedDress.id;
 
-      const uploadedPhotoUrls = await Promise.all(
-        sanitizedPhotoUrls.map((photoUrl, index) =>
-          uploadPhotoToStorage({
-            scopedSupabase,
-            storeType,
-            storeId,
-            itemId: insertedDress.id,
-            sourceUri: photoUrl,
-            sortOrder: index
-          })
-        )
-      );
+      const uploadedPhotoUrls: string[] = [];
+      for (const [index, photoUrl] of sanitizedPhotoUrls.entries()) {
+        const uploadedPhotoUrl = await uploadPhotoToStorage({
+          scopedSupabase,
+          storeType,
+          storeId,
+          itemId: insertedDress.id,
+          sourceUri: photoUrl,
+          sortOrder: index
+        });
+        uploadedPhotoUrls.push(uploadedPhotoUrl);
+      }
 
       const imageRows = uploadedPhotoUrls.map((url, index) => ({
         [inventorySchema.itemForeignKey]: insertedDress.id,
@@ -475,9 +676,111 @@ export default function InventoryScreen({ route, navigation }: Props) {
         throw imagesError;
       }
 
+      if (params.tags.length > 0) {
+        await AsyncStorage.setItem(getTagStorageKey(insertedDress.id), JSON.stringify(params.tags));
+      }
+
+      await Promise.all(sanitizedPhotoUrls.map(deletePendingLocalPhoto));
+      await loadDresses(true);
+
+      return {
+        itemId: insertedDress.id as string,
+        uploadedPhotoUrls
+      };
+    } catch (error) {
+      if (insertedItemId) {
+        try {
+          await scopedSupabase.from(inventorySchema.itemTable).delete().eq('id', insertedItemId);
+        } catch {
+          // Preserve the original upload/save failure for the user-facing alert.
+        }
+      }
+      throw error;
+    } finally {
+      setSavingDress(false);
+    }
+  }, [canManageInventory, inventorySchema.imageTable, inventorySchema.itemForeignKey, inventorySchema.itemTable, inventorySchema.titlePlural, inventorySchema.titleSingular, loadDresses, session?.user.id, storeId, storeType]);
+
+  const generateDebugProfile = useCallback(async () => {
+    const status = getOpenAiInventoryDebugStatus();
+    if (!status.available) {
+      Alert.alert('Debug generator unavailable', 'OpenAI inventory debug generation is only available in development builds.');
+      return;
+    }
+
+    if (!status.enabled) {
+      Alert.alert(
+        'Debug generator disabled',
+        'Set EXPO_PUBLIC_ENABLE_OPENAI_INVENTORY_DEBUG=true in Mobile_version/.env.local, then restart Expo.'
+      );
+      return;
+    }
+
+    if (!status.hasApiKey) {
+      Alert.alert(
+        'Debug API key missing',
+        'Add EXPO_PUBLIC_DEBUG_OPENAI_API_KEY to Mobile_version/.env.local, then restart Expo.'
+      );
+      return;
+    }
+
+    try {
+      setGeneratingDebugProfile(true);
+      setDebugNotification({ tone: 'info', message: 'Generating debug images with OpenAI...' });
+      const profile = await generateDebugInventoryProfile({
+        prompt: debugPrompt,
+        storeType,
+        imageCount: debugImageCount
+      });
+
+      if (profile.imageUris.length !== debugImageCount || profile.imageUris.some((imageUri) => !isSupportedImageUri(imageUri))) {
+        throw new Error(`OpenAI returned ${profile.imageUris.length} usable image(s), expected ${debugImageCount}.`);
+      }
+
+      setDressName((current) => current.trim() || profile.name);
+      setPhotoUrls(profile.imageUris);
+      setOptimizedPhotoCount(debugGeneratedPhotoCountMarker);
+      setGeneratedTagSuggestions(profile.suggestedTags);
+      setDebugNotification({ tone: 'info', message: 'Images generated. Uploading and saving this profile to inventory...' });
+
+      const savedItem = await saveInventoryItem({
+        name: dressName.trim() || profile.name,
+        price: priceText,
+        imageUris: profile.imageUris,
+        tags: profile.suggestedTags
+      });
+
+      setDebugNotification({
+        tone: 'success',
+        message: `Saved generated profile to inventory with ${savedItem.uploadedPhotoUrls.length} image(s). You can close this panel and see it in the grid.`
+      });
+    } catch (error) {
+      setDebugNotification({
+        tone: 'error',
+        message: `Debug generation/save failed: ${getErrorMessage(error)}`
+      });
+      console.error('[InventoryScreen] Debug inventory generation failed', {
+        storeId,
+        storeType,
+        requestedImageCount: debugImageCount,
+        error
+      });
+      Alert.alert('Could not generate debug profile', getErrorMessage(error));
+    } finally {
+      setGeneratingDebugProfile(false);
+    }
+  }, [debugImageCount, debugPrompt, dressName, priceText, saveInventoryItem, storeId, storeType]);
+
+  const createDress = useCallback(async () => {
+    try {
+      await saveInventoryItem({
+        name: dressName,
+        price: priceText,
+        imageUris: photoUrls,
+        tags: generatedTagSuggestions
+      });
       setShowCreateDressModal(false);
       resetForm();
-      await loadDresses(true);
     } catch (error) {
       if (isMissingInventorySchemaError(error, [inventorySchema.itemTable, inventorySchema.imageTable])) {
         Alert.alert(`Could not save ${inventorySchema.titleSingular}`, getInventorySchemaMissingMessage(inventorySchema.titlePlural));
@@ -496,18 +799,21 @@ export default function InventoryScreen({ route, navigation }: Props) {
       console.error('[InventoryScreen] Failed to save dress', {
         storeId,
         userId: session?.user.id,
-        photoCount: sanitizedPhotoUrls.length,
+        photoCount: photoUrls.length,
         error
       });
       Alert.alert(`Could not save ${inventorySchema.titleSingular}`, `Unable to save this ${inventorySchema.titleSingular} right now. ${debugMessage}`);
-    } finally {
-      setSavingDress(false);
     }
-  }, [dressName, inventorySchema.imageTable, inventorySchema.itemForeignKey, inventorySchema.itemTable, inventorySchema.titlePlural, inventorySchema.titleSingular, loadDresses, photoUrls, priceText, resetForm, session?.user.id, storeId, storeType]);
+  }, [dressName, generatedTagSuggestions, inventorySchema.imageTable, inventorySchema.itemTable, inventorySchema.titlePlural, inventorySchema.titleSingular, photoUrls, priceText, resetForm, saveInventoryItem, session?.user.id, storeId]);
 
   const deleteDress = useCallback(
     async (dress: Dress) => {
       if (deletingDressId) {
+        return;
+      }
+
+      if (!canManageInventory) {
+        Alert.alert('Owner access required', `Only store owners can delete ${inventorySchema.titlePlural}.`);
         return;
       }
 
@@ -536,7 +842,7 @@ export default function InventoryScreen({ route, navigation }: Props) {
         setDeletingDressId(null);
       }
     },
-    [deletingDressId, inventorySchema.itemTable, inventorySchema.titlePlural, inventorySchema.titleSingular, loadDresses, storeType]
+    [canManageInventory, deletingDressId, inventorySchema.itemTable, inventorySchema.titlePlural, inventorySchema.titleSingular, loadDresses, storeType]
   );
 
   const confirmDeleteDress = useCallback(
@@ -570,15 +876,15 @@ export default function InventoryScreen({ route, navigation }: Props) {
         return (
           <View key={dress.id} style={styles.dressTile}>
             <Pressable
-              style={styles.deleteButton}
+              style={[styles.deleteButton, !canManageInventory && styles.hiddenOwnerControl]}
               onPress={() => confirmDeleteDress(dress)}
-              disabled={isDeleting}
+              disabled={isDeleting || !canManageInventory}
               hitSlop={6}
             >
               <Text style={styles.deleteButtonText}>{isDeleting ? '…' : '✕'}</Text>
             </Pressable>
             <Pressable
-              onPress={() => navigation.navigate('DressProfile', { storeId, storeName, storeType, dress })}
+              onPress={() => navigation.navigate('DressProfile', { storeId, storeName, storeType, storeRole, dress })}
               style={styles.dressTileContent}
             >
               {leadImage ? (
@@ -616,13 +922,25 @@ export default function InventoryScreen({ route, navigation }: Props) {
           </View>
         );
       }),
-    [confirmDeleteDress, deletingDressId, dresses, inventorySchema.titleSingular, navigation, storeId, storeName, storeType, tagCountByDressId]
+    [canManageInventory, confirmDeleteDress, deletingDressId, dresses, inventorySchema.titleSingular, navigation, storeId, storeName, storeRole, storeType, tagCountByDressId]
   );
+
+  const debugNoticeToneStyle =
+    debugNotification?.tone === 'success'
+      ? styles.debugNoticeSuccess
+      : debugNotification?.tone === 'error'
+        ? styles.debugNoticeError
+        : styles.debugNoticeInfo;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{storeName} Inventory</Text>
+        {!canManageInventory ? (
+          <View style={styles.memberNotice}>
+            <Text style={styles.memberNoticeText}>View-only access. Ask a store owner to add, edit, or delete inventory profiles.</Text>
+          </View>
+        ) : null}
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -631,7 +949,11 @@ export default function InventoryScreen({ route, navigation }: Props) {
           </View>
         ) : (
           <View style={styles.tilesGrid}>
-            <Pressable style={[styles.dressTile, styles.addTile]} onPress={openCreateModal}>
+            <Pressable
+              style={[styles.dressTile, styles.addTile, !canManageInventory && styles.hiddenOwnerControl]}
+              onPress={openCreateModal}
+              disabled={!canManageInventory}
+            >
               <Text style={styles.addIcon}>＋</Text>
               <Text style={styles.addLabel}>{`Add ${inventorySchema.titleSingular.charAt(0).toUpperCase()}${inventorySchema.titleSingular.slice(1)}`}</Text>
             </Pressable>
@@ -643,66 +965,145 @@ export default function InventoryScreen({ route, navigation }: Props) {
       <Modal animationType="slide" transparent visible={showCreateDressModal} onRequestClose={closeCreateModal}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{`Create ${inventorySchema.titleSingular} profile`}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={`${inventorySchema.titleSingular.charAt(0).toUpperCase()}${inventorySchema.titleSingular.slice(1)} name (optional)`}
-              value={dressName}
-              onChangeText={setDressName}
-              autoCapitalize="words"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Price (optional)"
-              value={priceText}
-              onChangeText={setPriceText}
-              keyboardType="decimal-pad"
-            />
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContent}
+            >
+              <Text style={styles.modalTitle}>{`Create ${inventorySchema.titleSingular} profile`}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={`${inventorySchema.titleSingular.charAt(0).toUpperCase()}${inventorySchema.titleSingular.slice(1)} name (optional)`}
+                value={dressName}
+                onChangeText={setDressName}
+                autoCapitalize="words"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Price (optional)"
+                value={priceText}
+                onChangeText={setPriceText}
+                keyboardType="decimal-pad"
+              />
 
-            <Text style={styles.photoSectionLabel}>Photos (at least one required)</Text>
-            <Text style={styles.photoSectionHint}>
-              Choose images from your gallery or files. You can select multiple photos in one pick. Gallery picks are compressed to keep storage usage lower while preserving good quality.
-            </Text>
-            <View style={styles.photoButtonRow}>
-              <Pressable style={[styles.photoPickerButton, styles.filesButton]} onPress={() => void pickFromFiles()}>
-                <Text style={styles.photoPickerButtonText}>Files</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.photoPickerButton, styles.galleryButton]}
-                onPress={() => void pickFromGallery()}
-              >
-                <Text style={styles.photoPickerButtonText}>Gallery</Text>
-              </Pressable>
-            </View>
-
-            {photoUrls.length > 0 ? (
-              <View style={styles.previewContainer}>
-                <View style={styles.previewStack}>
-                  {photoUrls.length > 1 ? <View style={[styles.previewPhoto, styles.previewPhotoBack]} /> : null}
-                  <Image source={{ uri: photoUrls[0] }} style={[styles.previewPhoto, styles.previewPhotoFront]} />
-                </View>
-                <View style={styles.previewMeta}>
-                  <Text style={styles.previewCount}>{photoUrls.length} photo(s) selected</Text>
-                  <Text style={styles.previewHint}>{getImageStorageSavingsMessage(optimizedPhotoCount, photoUrls.length)}</Text>
-                  <Pressable style={styles.clearPhotosButton} onPress={clearPhotos}>
-                    <Text style={styles.clearPhotosButtonText}>Clear</Text>
-                  </Pressable>
-                </View>
+              <Text style={styles.photoSectionLabel}>Photos (at least one required)</Text>
+              <Text style={styles.photoSectionHint}>
+                Choose images from your gallery or files. You can select multiple photos in one pick. Gallery picks are compressed to keep storage usage lower while preserving good quality.
+              </Text>
+              <View style={styles.photoButtonRow}>
+                <Pressable style={[styles.photoPickerButton, styles.filesButton]} onPress={() => void pickFromFiles()}>
+                  <Text style={styles.photoPickerButtonText}>Files</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.photoPickerButton, styles.galleryButton]}
+                  onPress={() => void pickFromGallery()}
+                >
+                  <Text style={styles.photoPickerButtonText}>Gallery</Text>
+                </Pressable>
               </View>
-            ) : null}
 
-            <View style={styles.modalActions}>
-              <Pressable style={[styles.actionButton, styles.cancelButton]} onPress={closeCreateModal}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.actionButton, styles.saveButton, savingDress && styles.disabledButton]}
-                onPress={() => void createDress()}
-                disabled={savingDress}
-              >
-                <Text style={styles.saveButtonText}>{savingDress ? 'Saving...' : `Save ${inventorySchema.titleSingular}`}</Text>
-              </Pressable>
-            </View>
+              {canShowOpenAiDebugGenerator ? (
+                <View style={styles.debugPanel}>
+                  <Text style={styles.debugBadge}>DEBUG ONLY - DEVELOPMENT BUILDS ONLY</Text>
+                  <Pressable
+                    style={styles.debugGeneratorToggle}
+                    onPress={() => setShowDebugGenerator((previous) => !previous)}
+                    disabled={savingDress || generatingDebugProfile}
+                  >
+                    <Text style={styles.debugGeneratorToggleText}>
+                      {`Generate new ${inventorySchema.titleSingular} profile from prompt`}
+                    </Text>
+                  </Pressable>
+                  {showDebugGenerator ? (
+                    <View style={styles.debugGeneratorForm}>
+                      <TextInput
+                        style={[styles.input, styles.debugPromptInput]}
+                        placeholder={`Describe the ${inventorySchema.titleSingular} to generate`}
+                        value={debugPrompt}
+                        onChangeText={setDebugPrompt}
+                        multiline
+                      />
+                      <View style={styles.debugCountRow}>
+                        {[2, 3].map((count) => {
+                          const typedCount = count as 2 | 3;
+                          const selected = debugImageCount === typedCount;
+                          return (
+                            <Pressable
+                              key={count}
+                              style={[styles.debugCountButton, selected && styles.debugCountButtonActive]}
+                              onPress={() => setDebugImageCount(typedCount)}
+                              disabled={generatingDebugProfile}
+                            >
+                              <Text style={[styles.debugCountButtonText, selected && styles.debugCountButtonTextActive]}>
+                                {count} images
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      <Pressable
+                        style={[styles.debugGenerateButton, (generatingDebugProfile || savingDress) && styles.disabledButton]}
+                        onPress={() => void generateDebugProfile()}
+                        disabled={generatingDebugProfile || savingDress}
+                      >
+                        {generatingDebugProfile || savingDress ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+                        <Text style={styles.debugGenerateButtonText}>
+                          {generatingDebugProfile ? 'Generating debug images...' : savingDress ? 'Saving generated profile...' : 'Generate and save debug profile'}
+                        </Text>
+                      </Pressable>
+                      {debugNotification ? (
+                        <View style={[styles.debugNotice, debugNoticeToneStyle]}>
+                          <Text style={styles.debugNoticeText}>{debugNotification.message}</Text>
+                        </View>
+                      ) : null}
+                      {photoUrls.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.generatedPreviewRow}>
+                          {photoUrls.map((photoUrl, index) => (
+                            <Image key={`${photoUrl.slice(0, 32)}-${index}`} source={{ uri: photoUrl }} style={styles.generatedPreviewImage} />
+                          ))}
+                        </ScrollView>
+                      ) : null}
+                      {generatedTagSuggestions.length > 0 ? (
+                        <Text style={styles.debugTagHint}>
+                          {`Auto tags queued: ${generatedTagSuggestions.join(', ')}`}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {photoUrls.length > 0 ? (
+                <View style={styles.previewContainer}>
+                  <View style={styles.previewStack}>
+                    {photoUrls.length > 1 ? <View style={[styles.previewPhoto, styles.previewPhotoBack]} /> : null}
+                    <Image source={{ uri: photoUrls[0] }} style={[styles.previewPhoto, styles.previewPhotoFront]} />
+                  </View>
+                  <View style={styles.previewMeta}>
+                    <Text style={styles.previewCount}>{photoUrls.length} photo(s) selected</Text>
+                    <Text style={styles.previewHint}>{getImageStorageSavingsMessage(optimizedPhotoCount, photoUrls.length)}</Text>
+                    <Pressable style={styles.clearPhotosButton} onPress={clearPhotos}>
+                      <Text style={styles.clearPhotosButtonText}>Clear</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
+
+              <View style={styles.modalActions}>
+                <Pressable style={[styles.actionButton, styles.cancelButton]} onPress={closeCreateModal}>
+                  <Text style={styles.cancelButtonText}>{debugNotification?.tone === 'success' ? 'Done' : 'Cancel'}</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.actionButton, styles.saveButton, (savingDress || debugNotification?.tone === 'success') && styles.disabledButton]}
+                  onPress={() => void createDress()}
+                  disabled={savingDress || generatingDebugProfile || debugNotification?.tone === 'success'}
+                >
+                  <Text style={styles.saveButtonText}>
+                    {savingDress ? 'Saving...' : debugNotification?.tone === 'success' ? 'Saved' : `Save ${inventorySchema.titleSingular}`}
+                  </Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -714,6 +1115,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F5F7' },
   content: { padding: 16, gap: 12 },
   title: { fontSize: 28, fontWeight: '700', color: '#2E2A2B' },
+  memberNotice: {
+    borderWidth: 1,
+    borderColor: '#E9E4E6',
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    padding: 12
+  },
+  memberNoticeText: { color: '#6B6467', lineHeight: 19 },
   loadingContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24, gap: 8 },
   loadingText: { color: '#6B6467' },
   tilesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
@@ -742,6 +1151,7 @@ const styles = StyleSheet.create({
     zIndex: 2
   },
   deleteButtonText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  hiddenOwnerControl: { display: 'none' },
   addTile: { alignItems: 'center', justifyContent: 'center', gap: 8 },
   addIcon: { fontSize: 38, color: '#9d99ac' },
   addLabel: { color: '#6B6467', fontWeight: '600' },
@@ -777,9 +1187,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 20,
-    gap: 10,
     maxHeight: '88%'
   },
+  modalScrollContent: { gap: 10, paddingBottom: 8 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: '#231f32' },
   input: {
     borderWidth: 1,
@@ -802,6 +1212,71 @@ const styles = StyleSheet.create({
   filesButton: { backgroundColor: '#5f61cd' },
   galleryButton: { backgroundColor: '#8f46c8' },
   photoPickerButtonText: { color: '#FFFFFF', fontWeight: '700' },
+  debugPanel: {
+    borderWidth: 1,
+    borderColor: '#f0c36d',
+    backgroundColor: '#fff8e8',
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+    marginTop: 2
+  },
+  debugBadge: { color: '#8b5e00', fontSize: 11, fontWeight: '800' },
+  debugGeneratorToggle: {
+    minHeight: 42,
+    borderRadius: 9,
+    backgroundColor: '#2f4050',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12
+  },
+  debugGeneratorToggleText: { color: '#FFFFFF', fontWeight: '800', textAlign: 'center' },
+  debugGeneratorForm: { gap: 8 },
+  debugPromptInput: { minHeight: 82, textAlignVertical: 'top' },
+  debugCountRow: { flexDirection: 'row', gap: 8 },
+  debugCountButton: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#cfc7ad',
+    backgroundColor: '#fffdf6',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  debugCountButtonActive: { borderColor: '#2f4050', backgroundColor: '#dfe8ee' },
+  debugCountButtonText: { color: '#6b5b33', fontWeight: '700' },
+  debugCountButtonTextActive: { color: '#263744' },
+  debugGenerateButton: {
+    minHeight: 44,
+    borderRadius: 9,
+    backgroundColor: '#506b7f',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8
+  },
+  debugGenerateButtonText: { color: '#FFFFFF', fontWeight: '800' },
+  debugNotice: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  debugNoticeInfo: { backgroundColor: '#eef5f8', borderColor: '#b5ccd7' },
+  debugNoticeSuccess: { backgroundColor: '#edf7ed', borderColor: '#a9d5aa' },
+  debugNoticeError: { backgroundColor: '#fff0ed', borderColor: '#eba99d' },
+  debugNoticeText: { color: '#3c3a32', fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  generatedPreviewRow: { gap: 8, paddingVertical: 2 },
+  generatedPreviewImage: {
+    width: 78,
+    height: 104,
+    borderRadius: 8,
+    backgroundColor: '#efe9d9',
+    borderWidth: 1,
+    borderColor: '#d8ceb0'
+  },
+  debugTagHint: { color: '#755d25', fontSize: 12, lineHeight: 16 },
   previewContainer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   previewStack: { width: 54, height: 58, justifyContent: 'center', alignItems: 'center' },
   previewPhoto: {

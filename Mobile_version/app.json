@@ -8,10 +8,37 @@
     "platforms": ["ios", "android"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.example.bridalstudiomobile"
+      "bundleIdentifier": "com.example.bridalstudiomobile",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Bridal Studio uses your photo library only when you choose inventory photos for dress and ring profiles.",
+        "NSPhotoLibraryAddUsageDescription": "Bridal Studio may save generated session recap images only when you choose to export or share them."
+      }
     },
     "android": {
-      "package": "com.example.bridalstudiomobile"
+      "package": "com.example.bridalstudiomobile",
+      "blockedPermissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.GET_ACCOUNTS",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADVERTISE",
+        "android.permission.SEND_SMS",
+        "android.permission.RECEIVE_SMS",
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_MMS",
+        "android.permission.CALL_PHONE",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.READ_CALL_LOG",
+        "android.permission.WRITE_CALL_LOG"
+      ]
     }
   }
 }

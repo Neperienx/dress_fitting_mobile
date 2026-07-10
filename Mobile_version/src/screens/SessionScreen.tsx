@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  DimensionValue,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -18,10 +19,10 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
@@ -124,7 +125,7 @@ function formatSessionDate(isoDate: string) {
 export default function SessionScreen() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const navigation = useNavigation<BottomTabNavigationProp<AppTabsParamList>>();
-  const route = useRoute<{ params?: { open?: 'recent'; sessionId?: string; resetToStart?: boolean } }>();
+  const route = useRoute<RouteProp<AppTabsParamList, 'Session'>>();
   const { session } = useAuth();
   const { selectedStore } = useStore();
   const tagCatalog = useMemo(() => getTagCatalogByStoreType(selectedStore?.type), [selectedStore?.type]);
@@ -984,8 +985,8 @@ export default function SessionScreen() {
             <Text style={styles.analyticsCategoryTitle}>{group.category}</Text>
             {group.tags.map((tagRow) => {
               const total = Math.max(tagRow.likes + tagRow.dislikes, 1);
-              const likeWidth = `${(tagRow.likes / total) * 100}%`;
-              const dislikeWidth = `${(tagRow.dislikes / total) * 100}%`;
+              const likeWidth: DimensionValue = `${(tagRow.likes / total) * 100}%`;
+              const dislikeWidth: DimensionValue = `${(tagRow.dislikes / total) * 100}%`;
 
               return (
                 <View key={tagRow.tag} style={styles.analyticsRow}>

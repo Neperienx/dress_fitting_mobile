@@ -6,6 +6,10 @@ import { StoreType } from '../types/store';
 const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+function isDevelopmentRuntime() {
+  return typeof __DEV__ !== 'undefined' && __DEV__;
+}
+
 function normalizeSupabaseUrl(url?: string) {
   if (!url) {
     return url;
@@ -26,17 +30,32 @@ function normalizeSupabaseUrl(url?: string) {
 }
 
 const supabaseUrl = normalizeSupabaseUrl(rawSupabaseUrl);
+const isLocalSupabaseUrl =
+  Boolean(supabaseUrl) &&
+  (supabaseUrl?.includes('://localhost') ||
+    supabaseUrl?.includes('://127.0.0.1') ||
+    supabaseUrl?.includes('://10.0.2.2') ||
+    supabaseUrl?.includes('://0.0.0.0'));
+const productionConfigError =
+  !isDevelopmentRuntime() && isLocalSupabaseUrl
+    ? 'Production builds cannot use a local Supabase URL. Configure EXPO_PUBLIC_SUPABASE_URL with your hosted Supabase project URL.'
+    : null;
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey && !productionConfigError);
 
 export const missingSupabaseEnvMessage =
+  productionConfigError ??
   'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to Mobile_version/.env, then restart Expo.';
 
-if (!isSupabaseConfigured) {
+if (!isSupabaseConfigured && isDevelopmentRuntime()) {
   // eslint-disable-next-line no-console
   console.warn(
     'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. Falling back to a placeholder client until env vars are configured.'
   );
+}
+
+if (productionConfigError) {
+  throw new Error(productionConfigError);
 }
 
 if (rawSupabaseUrl && supabaseUrl && rawSupabaseUrl !== supabaseUrl) {

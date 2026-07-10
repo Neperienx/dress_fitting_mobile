@@ -27,12 +27,13 @@ function getTagStorageKey(dressId: string) {
 }
 
 export default function DressProfileScreen({ route }: Props) {
-  const { dress, storeType } = route.params;
+  const { dress, storeType, storeRole } = route.params;
   const tagCatalog = getTagCatalogByStoreType(storeType) as { language: string; categories: TagCategory[] };
   const photos = dress.dress_images;
   const [photoIndex, setPhotoIndex] = useState(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showTagManager, setShowTagManager] = useState(false);
+  const canManageInventory = storeRole === 'owner';
 
   React.useEffect(() => {
     let isMounted = true;
@@ -129,9 +130,15 @@ export default function DressProfileScreen({ route }: Props) {
           </View>
         ) : null}
 
-        <Pressable style={styles.manageButton} onPress={() => setShowTagManager(true)}>
-          <Text style={styles.manageButtonText}>Manage Tags</Text>
-        </Pressable>
+        {canManageInventory ? (
+          <Pressable style={styles.manageButton} onPress={() => setShowTagManager(true)}>
+            <Text style={styles.manageButtonText}>Manage Tags</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.memberNotice}>
+            <Text style={styles.memberNoticeText}>View-only profile. Store owners manage tags and inventory details.</Text>
+          </View>
+        )}
       </View>
 
       <Modal transparent visible={showTagManager} animationType="slide" onRequestClose={() => setShowTagManager(false)}>
@@ -218,6 +225,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   manageButtonText: { fontSize: 22, color: '#5e5871', fontWeight: '500' },
+  memberNotice: {
+    marginTop: 'auto',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#d8d4e7',
+    backgroundColor: '#FFFFFF',
+    padding: 14
+  },
+  memberNoticeText: { color: '#6B6467', lineHeight: 19, textAlign: 'center' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.35)', justifyContent: 'flex-end' },
   dismissArea: { flex: 1 },
   sheet: {

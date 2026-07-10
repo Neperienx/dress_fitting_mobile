@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getTagCatalogByStoreType } from '../data/tagCatalogs';
+import { assertSupabaseConfigured, supabase } from '../lib/supabase';
 import { StoresStackParamList } from '../navigation/AppNavigator';
 import { SavedSession, loadSessionHistory } from '../utils/sessionHistory';
 
@@ -36,11 +37,14 @@ const sections: MenuSection[] = [
 ];
 
 export default function StoreDetailScreen({ navigation, route }: Props) {
-  const { storeId, storeName, storeCity, storeType } = route.params;
+  const { storeId, storeName, storeCity, storeType, storeRole } = route.params;
   const [searchValue, setSearchValue] = useState('');
   const [activeOverlay, setActiveOverlay] = useState<MenuSection | null>(null);
   const [recentSessions, setRecentSessions] = useState<SavedSession[]>([]);
   const [insightsTab, setInsightsTab] = useState<InsightsTab>('overview');
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+  const canManageStore = storeRole === 'owner';
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -81,7 +85,7 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
     }
 
     if (section.key === 'inventory') {
-      navigation.navigate('Inventory', { storeId, storeName, storeType });
+      navigation.navigate('Inventory', { storeId, storeName, storeType, storeRole });
       return;
     }
 
@@ -93,6 +97,27 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
 
   const handleBackToStoreSelection = () => {
     navigation.navigate('StoresList');
+  };
+
+  const generateInviteCode = async () => {
+    if (!canManageStore || generatingInvite) {
+      return;
+    }
+
+    try {
+      setGeneratingInvite(true);
+      assertSupabaseConfigured();
+      const { data, error } = await supabase.rpc('generate_store_invite', { p_store_id: storeId });
+      if (error) {
+        throw error;
+      }
+
+      setInviteCode(String(data));
+    } catch (error) {
+      Alert.alert('Could not create invite', error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setGeneratingInvite(false);
+    }
   };
 
   const overallTagRows = useMemo(
@@ -210,6 +235,30 @@ export default function StoreDetailScreen({ navigation, route }: Props) {
           <Text style={styles.storeName}>{storeName}</Text>
         </View>
         <Text style={styles.storeCity}>{storeCity || 'Location not set'}</Text>
+        <Text style={styles.roleLabel}>{canManageStore ? 'Owner access' : 'Member access'}</Text>
+
+        {canManageStore ? (
+          <View style={styles.invitePanel}>
+            <View style={styles.inviteTextWrap}>
+              <Text style={styles.inviteTitle}>Store invite</Text>
+              <Text style={styles.inviteBody}>
+                Generate a one-time code for a team member. Members can start sessions and view inventory, but cannot change inventory.
+              </Text>
+              {inviteCode ? <Text selectable style={styles.inviteCode}>{inviteCode}</Text> : null}
+            </View>
+            <Pressable
+              style={[styles.inviteButton, generatingInvite && styles.inviteButtonDisabled]}
+              onPress={() => void generateInviteCode()}
+              disabled={generatingInvite}
+            >
+              <Text style={styles.inviteButtonText}>{generatingInvite ? 'Generating...' : inviteCode ? 'New code' : 'Invite code'}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.memberNotice}>
+            <Text style={styles.memberNoticeText}>Inventory is view-only for this account. You can still start sessions from the Session tab.</Text>
+          </View>
+        )}
 
         <TextInput
           style={styles.searchInput}
@@ -334,6 +383,47 @@ const styles = StyleSheet.create({
   backButtonText: { fontSize: 28, lineHeight: 29, color: '#6E6167', marginTop: -3 },
   storeName: { fontSize: 28, fontWeight: '700', color: '#433A3F' },
   storeCity: { color: '#8B7E83', marginTop: -4 },
+  roleLabel: { color: '#6B6467', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  invitePanel: {
+    borderWidth: 1,
+    borderColor: '#E6D9DF',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    gap: 12
+  },
+  inviteTextWrap: { gap: 5 },
+  inviteTitle: { color: '#433A3F', fontWeight: '700' },
+  inviteBody: { color: '#8B7E83', lineHeight: 19 },
+  inviteCode: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    borderRadius: 8,
+    backgroundColor: '#F3DCE3',
+    color: '#4E3D45',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  inviteButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#D59AA9',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  inviteButtonDisabled: { opacity: 0.65 },
+  inviteButtonText: { color: '#FFFFFF', fontWeight: '700' },
+  memberNotice: {
+    borderWidth: 1,
+    borderColor: '#E6D9DF',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 12
+  },
+  memberNoticeText: { color: '#6B6467', lineHeight: 19 },
   searchInput: {
     marginTop: 8,
     borderWidth: 1,

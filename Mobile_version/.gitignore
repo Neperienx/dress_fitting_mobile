@@ -9,6 +9,9 @@ dist/
 # environment variables
 .env
 .env.local
+.env*.local
+.env.debug
+.env.debug.local
 .env.development
 .env.production
 

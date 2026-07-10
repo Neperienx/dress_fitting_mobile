@@ -7,11 +7,21 @@ import { defaultStoreType, StoreType } from '../types/store';
 
 const SELECTED_STORE_KEY_PREFIX = 'selected-store-id';
 
+export type StoreRole = 'owner' | 'member';
+
 export type Store = {
   id: string;
   name: string;
   city: string | null;
   type: StoreType;
+  role: StoreRole;
+};
+
+export type StoreJoinRequestResult = {
+  requestId: string;
+  storeId: string;
+  storeName: string;
+  status: 'pending' | 'approved' | 'declined';
 };
 
 type StoreContextValue = {
@@ -20,6 +30,7 @@ type StoreContextValue = {
   loadingStores: boolean;
   refreshStores: () => Promise<void>;
   selectStore: (storeId: string) => Promise<void>;
+  joinStoreWithInvite: (code: string) => Promise<StoreJoinRequestResult>;
 };
 
 const StoreContext = createContext<StoreContextValue | undefined>(undefined);
@@ -64,18 +75,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       assertSupabaseConfigured();
       const { data, error } = await supabase
         .from('studios')
-        .select('id, name, city, type')
-        .eq('owner_id', session.user.id)
+        .select('id, name, city, type, store_members!inner(role)')
+        .eq('store_members.user_id', session.user.id)
         .order('created_at', { ascending: true });
 
       if (error) {
         throw error;
       }
 
-      const nextStores = ((data ?? []) as Array<{ id: string; name: string; city: string | null; type: string | null }>).map((store) => ({
-        ...store,
-        type: store.type === 'engagement_rings' ? 'engagement_rings' : defaultStoreType
-      }));
+      const nextStores = (
+        (data ?? []) as Array<{
+          id: string;
+          name: string;
+          city: string | null;
+          type: string | null;
+          store_members?: Array<{ role: string }> | { role: string } | null;
+        }>
+      ).map((store) => {
+        const memberships = Array.isArray(store.store_members) ? store.store_members : store.store_members ? [store.store_members] : [];
+        const role: StoreRole = memberships.some((membership) => membership.role === 'owner') ? 'owner' : 'member';
+
+        return {
+          id: store.id,
+          name: store.name,
+          city: store.city,
+          type: store.type === 'engagement_rings' ? 'engagement_rings' : defaultStoreType,
+          role
+        };
+      });
       setStores(nextStores);
       await applySelection(nextStores, session.user.id);
     } catch (error) {
@@ -104,6 +131,38 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [session?.user.id, stores]
   );
 
+  const joinStoreWithInvite = useCallback(
+    async (code: string) => {
+      const trimmedCode = code.trim().toUpperCase();
+      if (!session?.user.id) {
+        throw new Error('Please sign in again before joining a store.');
+      }
+
+      if (!trimmedCode) {
+        throw new Error('Enter an invite code.');
+      }
+
+      assertSupabaseConfigured();
+      const { data, error } = await supabase.rpc('request_store_join', { p_code: trimmedCode });
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const request = Array.isArray(data) ? data[0] : data;
+      if (!request) {
+        throw new Error('Join request was created, but the store could not be loaded.');
+      }
+
+      return {
+        requestId: request.request_id,
+        storeId: request.store_id,
+        storeName: request.store_name,
+        status: request.status === 'approved' || request.status === 'declined' ? request.status : 'pending'
+      };
+    },
+    [session?.user.id]
+  );
+
   useEffect(() => {
     if (!session?.user.id) {
       setStores([]);
@@ -123,9 +182,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       selectedStore,
       loadingStores,
       refreshStores,
-      selectStore
+      selectStore,
+      joinStoreWithInvite
     }),
-    [loadingStores, refreshStores, selectStore, selectedStore, stores]
+    [joinStoreWithInvite, loadingStores, refreshStores, selectStore, selectedStore, stores]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

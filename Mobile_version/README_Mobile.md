@@ -48,6 +48,50 @@ Use the Supabase URL that your app runtime can reach:
 1. Keep Email provider enabled in Supabase Authentication settings.
 2. If you changed schemas, run `npx supabase db reset` again.
 
+## Production environment
+
+Production builds must use the hosted Supabase project, not the local Supabase URL from development.
+
+Required production variables:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+Use [`.env.production.example`](./.env.production.example) as the template for the expected values. Do not commit a real `.env.production` file.
+
+For EAS builds, set the values in the production EAS environment before creating release builds:
+
+```bash
+eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_URL --value https://your-project-ref.supabase.co
+eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value your-production-anon-key
+```
+
+For local production-style verification, copy the template to `.env.production`, fill in the hosted Supabase values, and start Expo with that env file loaded by your shell/build command. The app intentionally rejects local URLs such as `localhost`, `127.0.0.1`, and `10.0.2.2` in production builds so an app-store build cannot accidentally point at your development machine.
+
+## Debug OpenAI image generation setup
+
+The OpenAI inventory image generator is a development/debug-only feature. It must not be enabled in production builds, and the OpenAI API key must never be committed to git.
+
+On a new machine:
+
+```bash
+cd Mobile_version
+cp .env.debug.example .env.debug
+```
+
+Then open `Mobile_version/.env.debug` and set:
+
+- `EXPO_PUBLIC_ENABLE_OPENAI_INVENTORY_DEBUG=true`
+- `EXPO_PUBLIC_DEBUG_OPENAI_API_KEY=your-real-openai-api-key`
+
+The real key file is ignored by git through `Mobile_version/.gitignore`, so it stays local to your machine. After creating or editing the file, fully restart Expo:
+
+```bash
+npm run start
+```
+
+If the debug generator does not appear, confirm that you are running a development build and that Expo was restarted after editing the env file.
+
 ## 4) What is ready
 
 - Auth flow with email/password:

@@ -1,6 +1,8 @@
-import React, { useLayoutEffect, useMemo, useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
+  ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -9,11 +11,13 @@ import {
   View
 } from 'react-native';
 
+import { assertSupabaseConfigured, supabase } from '../lib/supabase';
+
 type AlertSeverity = 'urgent' | 'warning' | 'pending';
 
 type AlertCategory = 'urgent' | 'other';
 
-type AlertItem = {
+type BaseAlertItem = {
   id: string;
   title: string;
   description: string;
@@ -23,8 +27,30 @@ type AlertItem = {
   ctaText: string;
 };
 
-const INITIAL_ALERTS: AlertItem[] = [
+type StaticAlertItem = BaseAlertItem & {
+  kind: 'static';
+};
+
+type JoinRequestAlertItem = BaseAlertItem & {
+  kind: 'join-request';
+  requestId: string;
+  storeName: string;
+  requesterLabel: string;
+};
+
+type AlertItem = StaticAlertItem | JoinRequestAlertItem;
+
+type PendingJoinRequestRow = {
+  request_id: string;
+  store_id: string;
+  store_name: string;
+  requester_label: string;
+  created_at: string;
+};
+
+const STATIC_ALERTS: StaticAlertItem[] = [
   {
+    kind: 'static',
     id: 'missing-tags',
     title: 'Missing Neckline Tags',
     description: '12 dresses missing neckline tags',
@@ -35,6 +61,7 @@ const INITIAL_ALERTS: AlertItem[] = [
     ctaText: 'Review inventory'
   },
   {
+    kind: 'static',
     id: 'low-photos',
     title: 'Low Res Photos',
     description: '8 dresses have low resolution photos',
@@ -43,37 +70,88 @@ const INITIAL_ALERTS: AlertItem[] = [
     category: 'urgent',
     severity: 'warning',
     ctaText: 'Fix stock images'
-  },
-  {
-    id: 'pending-invite',
-    title: 'Pending Team Invite',
-    description: "Kristin N. (Stylist) hasn't accepted invite",
-    details:
-      'The invitation has been pending for 5 days. You can resend the invite link or revoke it and invite a different email.',
-    category: 'other',
-    severity: 'pending',
-    ctaText: 'Manage invite'
   }
 ];
 
 function severitySymbol(severity: AlertSeverity) {
-  if (severity === 'urgent') return '❗';
-  if (severity === 'warning') return '⚠️';
-  return '⏳';
+  if (severity === 'urgent') return '!';
+  if (severity === 'warning') return '!';
+  return '...';
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'object' && error && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+
+  return 'Unknown error';
+}
+
+function mapJoinRequestToAlert(request: PendingJoinRequestRow): JoinRequestAlertItem {
+  return {
+    kind: 'join-request',
+    id: `join-request:${request.request_id}`,
+    requestId: request.request_id,
+    storeName: request.store_name,
+    requesterLabel: request.requester_label,
+    title: 'Shop join request',
+    description: `${request.requester_label} wants to join ${request.store_name}`,
+    details: `This user wants to join your shop: ${request.requester_label}`,
+    category: 'other',
+    severity: 'pending',
+    ctaText: 'Validate'
+  };
 }
 
 export default function AlertsScreen() {
   const navigation = useNavigation();
-  const [alerts, setAlerts] = useState(INITIAL_ALERTS);
+  const [dismissedStaticAlertIds, setDismissedStaticAlertIds] = useState<string[]>([]);
+  const [joinRequestAlerts, setJoinRequestAlerts] = useState<JoinRequestAlertItem[]>([]);
   const [activeAlert, setActiveAlert] = useState<AlertItem | null>(null);
+  const [loadingJoinRequests, setLoadingJoinRequests] = useState(false);
+  const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(null);
+
+  const staticAlerts = useMemo(
+    () => STATIC_ALERTS.filter((alert) => !dismissedStaticAlertIds.includes(alert.id)),
+    [dismissedStaticAlertIds]
+  );
+
+  const alerts = useMemo(() => [...staticAlerts, ...joinRequestAlerts], [joinRequestAlerts, staticAlerts]);
 
   const summary = useMemo(
     () => ({
-      missingTags: alerts.filter((alert) => alert.id === 'missing-tags').length > 0 ? 12 : 0,
-      missingPhotos: alerts.filter((alert) => alert.id === 'low-photos').length > 0 ? 8 : 0,
-      pendingInvite: alerts.filter((alert) => alert.id === 'pending-invite').length > 0 ? 1 : 0
+      missingTags: staticAlerts.some((alert) => alert.id === 'missing-tags') ? 12 : 0,
+      missingPhotos: staticAlerts.some((alert) => alert.id === 'low-photos') ? 8 : 0,
+      pendingInvite: joinRequestAlerts.length
     }),
-    [alerts]
+    [joinRequestAlerts.length, staticAlerts]
+  );
+
+  const loadJoinRequests = useCallback(async () => {
+    try {
+      setLoadingJoinRequests(true);
+      assertSupabaseConfigured();
+      const { data, error } = await supabase.rpc('list_pending_store_join_requests');
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setJoinRequestAlerts(((data ?? []) as PendingJoinRequestRow[]).map(mapJoinRequestToAlert));
+    } catch (error) {
+      console.warn('[AlertsScreen] Could not load join requests', error);
+    } finally {
+      setLoadingJoinRequests(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadJoinRequests();
+    }, [loadJoinRequests])
   );
 
   useLayoutEffect(() => {
@@ -83,9 +161,29 @@ export default function AlertsScreen() {
   const urgentAlerts = alerts.filter((alert) => alert.category === 'urgent');
   const otherAlerts = alerts.filter((alert) => alert.category === 'other');
 
-  const dismissAlert = (alertId: string) => {
-    setAlerts((prev) => prev.filter((item) => item.id !== alertId));
+  const dismissStaticAlert = (alertId: string) => {
+    setDismissedStaticAlertIds((prev) => [...prev, alertId]);
     setActiveAlert(null);
+  };
+
+  const reviewJoinRequest = async (alert: JoinRequestAlertItem, action: 'approve' | 'decline') => {
+    try {
+      setReviewingRequestId(alert.requestId);
+      assertSupabaseConfigured();
+      const rpcName = action === 'approve' ? 'approve_store_join_request' : 'decline_store_join_request';
+      const { error } = await supabase.rpc(rpcName, { p_request_id: alert.requestId });
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setActiveAlert(null);
+      await loadJoinRequests();
+      Alert.alert(action === 'approve' ? 'Request validated' : 'Request declined', `${alert.requesterLabel} was ${action === 'approve' ? 'added to' : 'not added to'} ${alert.storeName}.`);
+    } catch (error) {
+      Alert.alert('Could not update request', getErrorMessage(error));
+    } finally {
+      setReviewingRequestId(null);
+    }
   };
 
   return (
@@ -103,7 +201,7 @@ export default function AlertsScreen() {
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryValue}>{summary.pendingInvite}</Text>
-            <Text style={styles.summaryLabel}>Pending Invite</Text>
+            <Text style={styles.summaryLabel}>Join Requests</Text>
           </View>
         </View>
 
@@ -126,10 +224,11 @@ export default function AlertsScreen() {
 
         <View style={styles.sectionHeadingRow}>
           <Text style={styles.sectionTitle}>Other</Text>
+          {loadingJoinRequests ? <ActivityIndicator size="small" /> : null}
         </View>
         {otherAlerts.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No pending invite tasks.</Text>
+            <Text style={styles.emptyText}>No pending join requests.</Text>
           </View>
         ) : (
           otherAlerts.map((alert) => (
@@ -138,7 +237,7 @@ export default function AlertsScreen() {
                 <Text style={styles.alertTitle}>
                   {severitySymbol(alert.severity)} {alert.title}
                 </Text>
-                <Text style={styles.chevron}>›</Text>
+                <Text style={styles.chevron}>{'>'}</Text>
               </View>
               <Text style={styles.alertDescription}>{alert.description}</Text>
             </Pressable>
@@ -161,11 +260,28 @@ export default function AlertsScreen() {
               <Pressable style={styles.modalGhostButton} onPress={() => setActiveAlert(null)}>
                 <Text style={styles.modalGhostButtonText}>Not now</Text>
               </Pressable>
-              {activeAlert && (
-                <Pressable style={styles.modalPrimaryButton} onPress={() => dismissAlert(activeAlert.id)}>
+              {activeAlert?.kind === 'join-request' ? (
+                <>
+                  <Pressable
+                    style={[styles.modalGhostButton, reviewingRequestId === activeAlert.requestId && styles.disabledButton]}
+                    onPress={() => void reviewJoinRequest(activeAlert, 'decline')}
+                    disabled={reviewingRequestId === activeAlert.requestId}
+                  >
+                    <Text style={styles.modalGhostButtonText}>Decline</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalPrimaryButton, reviewingRequestId === activeAlert.requestId && styles.disabledButton]}
+                    onPress={() => void reviewJoinRequest(activeAlert, 'approve')}
+                    disabled={reviewingRequestId === activeAlert.requestId}
+                  >
+                    <Text style={styles.modalPrimaryButtonText}>Validate</Text>
+                  </Pressable>
+                </>
+              ) : activeAlert ? (
+                <Pressable style={styles.modalPrimaryButton} onPress={() => dismissStaticAlert(activeAlert.id)}>
                   <Text style={styles.modalPrimaryButtonText}>{activeAlert.ctaText}</Text>
                 </Pressable>
-              )}
+              ) : null}
             </View>
           </Pressable>
         </Pressable>
@@ -330,5 +446,8 @@ const styles = StyleSheet.create({
   modalPrimaryButtonText: {
     color: '#FFFFFF',
     fontWeight: '600'
+  },
+  disabledButton: {
+    opacity: 0.65
   }
 });

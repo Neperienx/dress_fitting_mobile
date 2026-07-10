@@ -28,12 +28,15 @@ const STORE_TYPES = [
 
 export default function StoresScreen({ navigation }: Props) {
   const { session } = useAuth();
-  const { stores, loadingStores, refreshStores, selectStore } = useStore();
+  const { stores, loadingStores, refreshStores, selectStore, joinStoreWithInvite } = useStore();
   const [showCreateStoreModal, setShowCreateStoreModal] = useState(false);
+  const [showJoinStoreModal, setShowJoinStoreModal] = useState(false);
   const [storeName, setStoreName] = useState('');
   const [storeLocation, setStoreLocation] = useState('');
   const [storeType, setStoreType] = useState<StoreType>(defaultStoreType);
+  const [inviteCode, setInviteCode] = useState('');
   const [savingStore, setSavingStore] = useState(false);
+  const [joiningStore, setJoiningStore] = useState(false);
 
   const createStore = useCallback(async () => {
     const trimmedName = storeName.trim();
@@ -79,6 +82,23 @@ export default function StoresScreen({ navigation }: Props) {
     }
   }, [refreshStores, session?.user.id, storeLocation, storeName, storeType]);
 
+  const joinStore = useCallback(async () => {
+    try {
+      setJoiningStore(true);
+      const request = await joinStoreWithInvite(inviteCode);
+      setInviteCode('');
+      setShowJoinStoreModal(false);
+      Alert.alert(
+        'Request sent',
+        `Your request to join ${request.storeName} was sent to the shop owner. The store will appear here after approval.`
+      );
+    } catch (error) {
+      Alert.alert('Could not join store', error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setJoiningStore(false);
+    }
+  }, [inviteCode, joinStoreWithInvite]);
+
   const storeTiles = useMemo(
     () =>
       stores.map((store) => (
@@ -91,7 +111,8 @@ export default function StoresScreen({ navigation }: Props) {
               storeId: store.id,
               storeName: store.name,
               storeCity: store.city,
-              storeType: store.type
+              storeType: store.type,
+              storeRole: store.role
             });
           }}
         >
@@ -103,7 +124,7 @@ export default function StoresScreen({ navigation }: Props) {
             {store.city || 'Location not set'}
           </Text>
           <Text numberOfLines={1} style={styles.storeTypePill}>
-            {getStoreTypeLabel(store.type)}
+            {`${getStoreTypeLabel(store.type)} - ${store.role === 'owner' ? 'Owner' : 'Member'}`}
           </Text>
         </Pressable>
       )),
@@ -125,6 +146,10 @@ export default function StoresScreen({ navigation }: Props) {
             <Pressable style={[styles.storeTile, styles.addTile]} onPress={() => setShowCreateStoreModal(true)}>
               <Text style={styles.addIcon}>＋</Text>
               <Text style={styles.addLabel}>New Store</Text>
+            </Pressable>
+            <Pressable style={[styles.storeTile, styles.addTile]} onPress={() => setShowJoinStoreModal(true)}>
+              <Text style={styles.addIcon}>#</Text>
+              <Text style={styles.addLabel}>Join Store</Text>
             </Pressable>
             {storeTiles}
           </View>
@@ -182,6 +207,35 @@ export default function StoresScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
+
+      <Modal animationType="slide" transparent visible={showJoinStoreModal} onRequestClose={() => setShowJoinStoreModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Join store</Text>
+            <Text style={styles.modalHint}>Enter the one-time code from the store owner.</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Invite code"
+              value={inviteCode}
+              onChangeText={setInviteCode}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.actionButton, styles.cancelButton]} onPress={() => setShowJoinStoreModal(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.actionButton, styles.saveButton, joiningStore && styles.disabledButton]}
+                onPress={() => void joinStore()}
+                disabled={joiningStore}
+              >
+                <Text style={styles.saveButtonText}>{joiningStore ? 'Joining...' : 'Join'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -232,6 +286,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   modalTitle: { fontSize: 20, fontWeight: '700', color: '#231f32' },
+  modalHint: { color: '#6B6467', lineHeight: 19 },
   input: {
     borderWidth: 1,
     borderColor: '#d4d0e2',
